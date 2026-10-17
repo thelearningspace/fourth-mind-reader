@@ -1,7 +1,7 @@
 {
-  "name": "third-mind-reader",
-  "version": "1.0.2",
-  "description": "Third Mind Reader — Obsidian Plugin",
+  "name": "fourth-mind-reader",
+  "version": "1.0.2-fmr.1",
+  "description": "Third Mind Reader \u2014 Obsidian Plugin",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

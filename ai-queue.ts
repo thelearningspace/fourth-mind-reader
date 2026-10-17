@@ -90,7 +90,7 @@ export async function processPendingInFile(
 			const res = await chat(provider, model, {
 				messages,
 				systemPrompt: buildGlossSystemPrompt(settings, title, entry),
-				...tokenBudget(entry.mode),
+				...tokenBudget(entry.mode, settings.replyTokens),
 				// Never stream here: there is no chat log to stream into, and a
 				// buffered call is the one shape both cloud and local support.
 				stream: false,

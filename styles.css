@@ -1,4 +1,4 @@
-/* ── Third Mind Reader ──────────────────────────────────────────────────────── */
+/* ── Fourth Mind Reader ──────────────────────────────────────────────────────── */
 
 /* Read by the Style Settings plugin, which applies each choice as a variable on
    <body>. Only options that can't change how much text fits a page belong here:
@@ -6,14 +6,14 @@
    the plugin's own settings → Appearance. */
 /* @settings
 
-name: Third Mind Reader
-id: third-mind-reader
+name: Fourth Mind Reader
+id: fourth-mind-reader
 settings:
     -
         id: tmr-style-intro
         type: info-text
         markdown: true
-        description: "Font, text size, spacing and margins are in **Settings → Third Mind Reader → Appearance**."
+        description: "Font, text size, spacing and margins are in **Settings → Fourth Mind Reader → Appearance**."
     -
         id: tmr-gloss-colours
         title: Gloss colours
@@ -321,7 +321,7 @@ body.is-translucent .tmr-root.tmr-3c-mode:not([data-tmr-theme="light"]) {
 /* Hide the tab title bar inside the epub reader — it's redundant with the
    tab label and the ToC pane. Scoped to data-type so all other views are
    unaffected and no Obsidian setting needs to change. */
-.workspace-leaf-content[data-type="third-mind-reader"] .view-header {
+.workspace-leaf-content[data-type="fourth-mind-reader"] .view-header {
 	display: none;
 }
 
@@ -337,8 +337,8 @@ body.is-translucent .tmr-root.tmr-3c-mode:not([data-tmr-theme="light"]) {
    margin: if Obsidian ever resizes that band, this still lands exactly below
    the status bar instead of underneath it. The failure mode is "unchanged",
    not "text under the notch". */
-body.is-phone .workspace-leaf-content[data-type="third-mind-reader"] .view-content,
-body.is-phone .workspace-leaf-content[data-type="tmr-library"] .view-content {
+body.is-phone .workspace-leaf-content[data-type="fourth-mind-reader"] .view-content,
+body.is-phone .workspace-leaf-content[data-type="fmr-library"] .view-content {
 	margin-top: var(--safe-area-inset-top, 0px);
 	/* …and paint that band ourselves, or it keeps whatever background the user's
 	   Obsidian theme has — a hard seam above the reader in 3C mode.
@@ -4437,14 +4437,14 @@ body.is-mobile .tmr-highlights-item-delete::after {
 
 
 /* ── Library View ─────────────────────────────────────────────────────────────
-   The plugin's home surface (LibraryView, VIEW_TYPE "tmr-library"). Inherits the
+   The plugin's home surface (LibraryView, VIEW_TYPE "fmr-library"). Inherits the
    .tmr-root token layer + 3C mode plumbing, so it tracks the reader's theme.
    Layout is a fixed header above a scrolling body — the root is overflow:hidden,
    so the body owns the scroll and the header stays put ("sticky" via flex). */
 
 /* Hide Obsidian's redundant tab title bar inside the Library; the sticky header
    carries the title. Mirrors the reader's view-header rule. */
-.workspace-leaf-content[data-type="tmr-library"] .view-header {
+.workspace-leaf-content[data-type="fmr-library"] .view-header {
 	display: none;
 }
 

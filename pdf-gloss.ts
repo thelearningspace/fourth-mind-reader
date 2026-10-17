@@ -972,7 +972,7 @@ export class PdfGlossController extends Component {
 			}
 		} catch (err) {
 			console.error("[ThirdMindReader] PDF gloss persist failed", err);
-			new Notice("Third Mind Reader: failed to save annotation");
+			new Notice("Fourth Mind Reader: failed to save annotation");
 		} finally {
 			this.persisting--;
 			this.dismiss();

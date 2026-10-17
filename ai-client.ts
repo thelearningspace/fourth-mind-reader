@@ -492,8 +492,13 @@ export function isLocalEndpoint(endpoint: string | undefined): boolean {
  *  stop a runaway, not the lever for brevity — the system prompts do that. The
  *  reasoning allowance is uniform: how hard a question is to think about has
  *  little to do with how long its answer should be. */
-export function tokenBudget(mode: string): { maxTokens: number; reasoningTokens: number } {
-	return { maxTokens: mode === "explain" ? 512 : 1024, reasoningTokens: 1024 };
+export function tokenBudget(
+	mode: string,
+	replyTokens?: Partial<Record<string, number>>,
+): { maxTokens: number; reasoningTokens: number } {
+	const custom = replyTokens?.[mode];
+	const maxTokens = custom && custom > 0 ? custom : mode === "explain" ? 512 : 1024;
+	return { maxTokens, reasoningTokens: 1024 };
 }
 
 /** The model a newly-added provider starts on, so it works without a trip to

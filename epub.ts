@@ -102,7 +102,7 @@ export async function readEpubMeta(data: ArrayBuffer): Promise<EpubMeta> {
  *  reporting a bug. */
 export class EpubDrmError extends Error {
 	constructor(public scheme: string) {
-		super(`This epub is protected by ${scheme} and can't be opened. Third Mind Reader only reads DRM-free epubs.`);
+		super(`This epub is protected by ${scheme} and can't be opened. Fourth Mind Reader only reads DRM-free epubs.`);
 		this.name = "EpubDrmError";
 	}
 }

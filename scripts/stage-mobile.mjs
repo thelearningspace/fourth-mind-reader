@@ -19,7 +19,7 @@ import { fileURLToPath } from "url";
 const pluginDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const vaultRoot = resolve(pluginDir, "../../..");
 const manifest = JSON.parse(readFileSync(join(pluginDir, "manifest.json"), "utf8"));
-const stageDir = join(vaultRoot, "Third Mind Reader Mobile", manifest.id);
+const stageDir = join(vaultRoot, "Fourth Mind Reader Mobile", manifest.id);
 
 mkdirSync(stageDir, { recursive: true });
 for (const file of ["main.js", "styles.css"]) {

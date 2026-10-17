@@ -1,11 +1,11 @@
 {
-  "id": "third-mind-reader",
-  "name": "Third Mind Reader",
-  "version": "1.0.2",
-  "minAppVersion": "1.13.0",
-  "description": "An opinionated EPUB and PDF reader: highlights, linked companion notes, and an inline AI librarian.",
-  "author": "Rohan Bell",
-  "authorUrl": "https://github.com/Hipst3rMusic",
-  "fundingUrl": "https://ko-fi.com/M7I223W2ID",
-  "isDesktopOnly": false
+	"id": "fourth-mind-reader",
+	"name": "Fourth Mind Reader",
+	"version": "1.0.2-fmr.1",
+	"minAppVersion": "1.13.0",
+	"description": "Personal fork of Third Mind Reader by Rohan Bell: EPUB and PDF reader with highlights, companion notes, an inline AI librarian, and adjustable AI reply length.",
+	"author": "Rohan Bell",
+	"authorUrl": "https://github.com/Hipst3rMusic",
+	"fundingUrl": "https://ko-fi.com/M7I223W2ID",
+	"isDesktopOnly": false
 }

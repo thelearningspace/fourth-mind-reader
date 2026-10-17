@@ -92,6 +92,14 @@ export type PaneTab = "annotations" | "conversations";
  *  calls the model. */
 export type AiPromptMode = "explain" | "examine" | "exclaim" | "enquiry";
 
+/** Default reply ceilings per mode, in tokens (roughly ¾ of a word each). */
+export const DEFAULT_REPLY_TOKENS: Record<AiPromptMode, number> = {
+	explain: 1024,
+	examine: 4096,
+	exclaim: 2048,
+	enquiry: 2048,
+};
+
 export const DEFAULT_SYSTEM_PROMPTS: Record<AiPromptMode, string> = {
 	explain:
 		`You are a concise reading assistant for "{book}". `
@@ -145,6 +153,8 @@ export interface HighlightsPaneSettings extends GlossHostSettings {
 	/** Mobile only: force every AI submission into the deferred queue. */
 	deferAiToDesktop: boolean;
 	systemPrompts: Record<AiPromptMode, string>;
+	/** Longest reply, in tokens, each AI Gloss mode may return. */
+	replyTokens: Record<AiPromptMode, number>;
 	/** Per-document record; only `pane` is the pane's business. Keyed by vault
 	 *  path, shared with the reader's position store. */
 	bookPositions: Record<string, { pane?: PaneTab }>;
@@ -861,7 +871,7 @@ export class HighlightsPane extends Component {
 			await this.patchCalloutInDoc(saved);
 		} catch (err) {
 			console.error("[ThirdMindReader] commitNoteEdit failed", err);
-			new Notice("Third Mind Reader: failed to save note");
+			new Notice("Fourth Mind Reader: failed to save note");
 		}
 		this.host.repaintHighlights();
 		this.renderHighlightsList();
@@ -893,7 +903,7 @@ export class HighlightsPane extends Component {
 				await this.app.vault.process(file, (doc) => this.removeCalloutFromDoc(doc, saved));
 			} catch (err) {
 				console.error("[ThirdMindReader] deleteHighlightAt failed", err);
-				new Notice("Third Mind Reader: failed to delete annotation");
+				new Notice("Fourth Mind Reader: failed to delete annotation");
 				return;
 			}
 		}
@@ -1478,7 +1488,7 @@ export class HighlightsPane extends Component {
 			const res = await chat(provider, model, {
 				messages,
 				systemPrompt: this.host.buildAiSystemPrompt(saved),
-				...tokenBudget(saved.mode),
+				...tokenBudget(saved.mode, this.host.settings().replyTokens),
 				stream: useStreaming,
 				signal: abort.signal,
 				onResponseStart: () => {
@@ -1673,7 +1683,7 @@ export class HighlightsPane extends Component {
 					const setting = (this.app as unknown as { setting?: { open: () => void; openTabById: (id: string) => void } }).setting;
 					if (setting) {
 						setting.open();
-						setting.openTabById("third-mind-reader");
+						setting.openTabById("fourth-mind-reader");
 					}
 				})
 		);

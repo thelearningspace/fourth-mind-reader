@@ -3,7 +3,7 @@ import type ThirdMindReader from "./main";
 import { LOGO_3C_SVG } from "./main";
 import { scanLibrary, computeCollections, detectExplodedEpubs, type LibraryBook } from "./library-scan";
 
-export const LIBRARY_VIEW_TYPE = "tmr-library";
+export const LIBRARY_VIEW_TYPE = "fmr-library";
 
 /** Rotating subtitle greetings. Cosmetic — one is picked at random per mount. */
 const GREETINGS = [

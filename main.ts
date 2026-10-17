@@ -3,6 +3,7 @@ import {
 	PluginSettingTab,
 	Setting,
 	SettingGroup,
+	SliderComponent,
 	SettingPage,
 	type SettingDefinition,
 	type SettingDefinitionItem,
@@ -77,6 +78,7 @@ import {
 // The right-rail Highlights pane (Annotations / Conversations / AI chat). Owns
 // its own DOM and the whole AI-exchange path; ReaderView is its first host.
 import {
+	DEFAULT_REPLY_TOKENS,
 	DEFAULT_SYSTEM_PROMPTS,
 	HighlightsPane,
 	buildGlossSystemPrompt,
@@ -96,7 +98,7 @@ import LabradaRegular from "./fonts/Labrada-VariableFont_wght.ttf";
 import LabradaItalic from "./fonts/Labrada-Italic-VariableFont_wght.ttf";
 import KodeMono from "./fonts/KodeMono-VariableFont_wght.ttf";
 
-export const READER_VIEW_TYPE = "third-mind-reader";
+export const READER_VIEW_TYPE = "fourth-mind-reader";
 
 // Book search: shortest queryable string, total hits collected before bailing,
 // and how many rows actually render (the rest collapse into a "more" footer).
@@ -152,6 +154,8 @@ interface ThirdMindReaderSettings {
 	 *  substituted with the book title; the selected passage is appended
 	 *  automatically by `buildAiSystemPrompt`. */
 	systemPrompts: Record<AiPromptMode, string>;
+	/** Longest reply, in tokens, each AI Gloss mode may return. */
+	replyTokens: Record<AiPromptMode, number>;
 	/** Per-book display overrides for title/author, keyed by vault path. The
 	 *  epub file is never modified — these only change how the Library renders
 	 *  (e.g. trimming a junk suffix baked into the OPF metadata). */
@@ -250,6 +254,7 @@ const DEFAULT_SETTINGS: ThirdMindReaderSettings = {
 	showBareFlaggedConversations: false,
 	deferAiToDesktop: false,
 	systemPrompts: { ...DEFAULT_SYSTEM_PROMPTS },
+	replyTokens: { ...DEFAULT_REPLY_TOKENS },
 	libraryOverrides: {},
 	libraryCollectionOrder: [],
 	libraryRoot: DEFAULT_LIBRARY_ROOT,
@@ -477,7 +482,7 @@ class LibrarySetupModal extends Modal {
 		const { contentEl } = this;
 		this.setTitle("Where do you keep your books?");
 		contentEl.createEl("p", {
-			text: "Third Mind Reader shows the EPUBs and PDFs in one vault folder. Point it at a folder you already use, or keep the default and it will be created for you.",
+			text: "Fourth Mind Reader shows the EPUBs and PDFs in one vault folder. Point it at a folder you already use, or keep the default and it will be created for you.",
 		});
 
 		new Setting(contentEl).setName("Library folder").addText((t) => {
@@ -575,8 +580,8 @@ class HelpModal extends Modal {
 		header.createEl("p", {
 			cls: "tmr-help-intro",
 			text: touch
-				? "Third Mind Reader has been adapted to work on Mobile & Tablet Devices. Tap on either side to navigate, and the centre to reveal the panel buttons."
-				: "Third Mind Reader is keyboard-first. Hover over the page to reveal the panel buttons, everything else is a keystroke away.",
+				? "Fourth Mind Reader has been adapted to work on Mobile & Tablet Devices. Tap on either side to navigate, and the centre to reveal the panel buttons."
+				: "Fourth Mind Reader is keyboard-first. Hover over the page to reveal the panel buttons, everything else is a keystroke away.",
 		});
 
 		for (const group of helpGroups(touch)) {
@@ -937,7 +942,7 @@ export class ReaderView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return this.currentFile?.basename ?? "Third Mind Reader";
+		return this.currentFile?.basename ?? "Fourth Mind Reader";
 	}
 
 	getIcon(): string {
@@ -3752,7 +3757,7 @@ export class ReaderView extends ItemView {
 			await this.persistGloss(mode, userText, quote, highlight);
 		} catch (err) {
 			console.error("persistGloss failed", err);
-			new Notice("Third Mind Reader: failed to save annotation");
+			new Notice("Fourth Mind Reader: failed to save annotation");
 			return;
 		}
 		// All AI modes open the Conversations tab immediately on submit so
@@ -3946,7 +3951,7 @@ export class ReaderView extends ItemView {
 
 		const paraId = this.firstParaIdOnSpread();
 		if (!paraId) {
-			new Notice("Third Mind Reader: nothing on this page to bookmark");
+			new Notice("Fourth Mind Reader: nothing on this page to bookmark");
 			return;
 		}
 		const built = this.buildBookmarkCallout(paraId);
@@ -5057,7 +5062,7 @@ export class ReaderView extends ItemView {
 		if (this.popoutGuardEl) return;
 		const guard = this.containerEl.createDiv({ cls: "tmr-popout-guard" });
 		this.popoutGuardEl = guard;
-		guard.createDiv({ cls: "tmr-popout-guard-title", text: "Third Mind Reader only works in the main window" });
+		guard.createDiv({ cls: "tmr-popout-guard-title", text: "Fourth Mind Reader only works in the main window" });
 		guard.createDiv({
 			cls: "tmr-popout-guard-text",
 			text: "Pop-out windows aren't supported yet. Move this book back to keep reading.",
@@ -5595,6 +5600,7 @@ export default class ThirdMindReader extends Plugin {
 		// Fresh object with every mode filled — guards against a shared
 		// reference to DEFAULT_SETTINGS and forward-compat for new modes.
 		this.settings.systemPrompts = { ...DEFAULT_SYSTEM_PROMPTS, ...this.settings.systemPrompts };
+		this.settings.replyTokens = { ...DEFAULT_REPLY_TOKENS, ...this.settings.replyTokens };
 		let needsPersist = this.migrateApiKeysToSecretStorage();
 		// Migration: the model used to fall back to a hardcoded id per kind when
 		// `defaultModel` was unset, so an Anthropic/OpenAI provider added before
@@ -6225,6 +6231,18 @@ class TmrSettingTab extends PluginSettingTab {
 						render: (setting: Setting) => this.renderSystemPrompt(setting, id),
 					})),
 				},
+				{
+					type: "page",
+					name: "Reply length",
+					desc: "The longest reply each AI Gloss mode may return, in tokens "
+						+ "(a token is roughly three quarters of a word). A reply that reaches "
+						+ "the limit is cut off, so raise it if answers stop mid-sentence.",
+					items: SYSTEM_PROMPT_MODES.map(({ id, label }) => ({
+						name: label,
+						desc: "",
+						render: (setting: Setting) => this.renderReplyTokens(setting, id),
+					})),
+				},
 			],
 		};
 	}
@@ -6462,6 +6480,33 @@ class TmrSettingTab extends PluginSettingTab {
 		}
 		await this.plugin.saveSettings();
 		this.update();
+	}
+
+	private renderReplyTokens(setting: Setting, id: AiPromptMode): void {
+		const describe = (n: number) => setting.setDesc(`${n} tokens ≈ ${Math.round(n * 0.75)} words`);
+		let slider!: SliderComponent;
+		describe(this.plugin.settings.replyTokens[id]);
+		setting
+			.addSlider(s => {
+				slider = s;
+				s.setLimits(256, 16384, 256)
+					.setValue(this.plugin.settings.replyTokens[id])
+					.setDynamicTooltip()
+					.onChange(async v => {
+						this.plugin.settings.replyTokens[id] = v;
+						describe(v);
+						await this.plugin.saveSettings();
+					});
+			})
+			.addExtraButton(b => b
+				.setIcon("rotate-ccw")
+				.setTooltip("Reset to default")
+				.onClick(async () => {
+					this.plugin.settings.replyTokens[id] = DEFAULT_REPLY_TOKENS[id];
+					slider.setValue(DEFAULT_REPLY_TOKENS[id]);
+					describe(DEFAULT_REPLY_TOKENS[id]);
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	private renderSystemPrompt(setting: Setting, id: AiPromptMode): void {
