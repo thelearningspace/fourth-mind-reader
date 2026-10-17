@@ -1,3 +1,13 @@
+# Fourth Mind Reader
+
+A personal fork of [Third Mind Reader](https://github.com/Hipst3rMusic/obsidian-third-mind-reader) by Rohan Bell (AGPL-3.0). Changes in this fork, October 2026:
+
+- **Adjustable reply length.** Settings → Fourth Mind Reader → Reply length sets the token limit for each AI mode (Explain, Examine, Exclaim, Enquiry). The original fixed it at 512 tokens for Explain and 1024 for the rest.
+- **Shelf-style Library.** The Library view (`shelf-view.ts`, `shelf-covers.ts`) is rebuilt as a shelf of book covers with Continue reading, Recently added, kind, status and collection filters, sorting, and a details panel with stats and highlights. Its layout is adapted from the Library view of [ZettelFlow](https://github.com/RafaelGB/Obsidian-ZettelFlow) by RafaelGB (MIT).
+- **Renamed** to Fourth Mind Reader (plugin id `fourth-mind-reader`) so it can be installed beside the original. New annotation notes keep the `third-mind-reader` tag so they match existing ones.
+
+---
+
 # Third Mind Reader
 
 ![Third Mind Reader running on a laptop, tablet and phone](assets/cover.png)

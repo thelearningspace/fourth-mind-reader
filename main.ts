@@ -49,7 +49,8 @@ import {
 import { OffsetMap, type CursorRange, isRegisterableBlock, REGISTERABLE_BLOCK_SELECTOR } from "./pretext-layer";
 import { isLocalEndpoint, probeProvider, starterModel, type AiProvider, type ProviderKind, type LocalRuntime } from "./ai-client";
 import { findFlaggedDocs, processPendingInFile } from "./ai-queue";
-import { LibraryView, LIBRARY_VIEW_TYPE } from "./library-view";
+import { LibraryView, LIBRARY_VIEW_TYPE } from "./shelf-view";
+import { clearCovers } from "./shelf-covers";
 import { type LibraryOverride, invalidateMetaCache, configureLibraryPaths, libraryRootPath, annotationsFolderPath, DEFAULT_LIBRARY_ROOT, companionDocPath, sanitizeFileName } from "./library-scan";
 // Shared Gloss grammar — the annotation surface, saved-highlight model, and
 // companion-doc writers that the EPUB reader and the PDF controller both drive.
@@ -5355,6 +5356,7 @@ export default class ThirdMindReader extends Plugin {
 
 	onunload(): void {
 		document.getElementById("tmr-bundled-fonts")?.remove();
+		clearCovers();
 	}
 
 	/** The reader view of the currently-active leaf, or null. Reader commands

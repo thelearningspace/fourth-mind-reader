@@ -38,7 +38,7 @@ export interface LibraryBook {
 	/** 0..1 reading fraction, from `settings.bookPositions[path].pct` (0 if unread). */
 	progress: number;
 	/** Epoch ms of last reading activity; 0 for never-opened books. Sort key for
-	 *  the shelf — see `sortForShelf` in library-view.ts. */
+	 *  the shelf — see `sorted` in shelf-view.ts. */
 	lastRead: number;
 	/** Annotation count — `> [!mode]-` callout headers in the companion doc. */
 	marks: number;
