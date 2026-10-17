@@ -206,6 +206,9 @@ const READER_FONTS = {
 	obsidian: { label: "Obsidian's text font", family: "var(--font-text)" },
 	labrada: { label: "Labrada", family: "\"Labrada\", serif" },
 	rosarivo: { label: "Rosarivo", family: "\"Rosarivo\", serif" },
+	// Amazon's Kindle typeface. Not bundled (it isn't ours to ship): it renders
+	// only where the font is installed on the device, and falls back to Georgia.
+	bookerly: { label: "Bookerly (if installed)", family: "\"Bookerly\", Georgia, serif" },
 	serif: { label: "System serif", family: "ui-serif, Georgia, serif" },
 	sans: { label: "System sans-serif", family: "system-ui, -apple-system, sans-serif" },
 } as const;
