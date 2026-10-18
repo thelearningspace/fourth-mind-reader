@@ -11,6 +11,7 @@ import {
 	Menu,
 	App,
 	ItemView,
+	FileView,
 	WorkspaceLeaf,
 	type ViewStateResult,
 	type ViewState,
@@ -90,6 +91,7 @@ import {
 	type PaneTab,
 } from "./highlights-pane";
 import { PdfGlossManager } from "./pdf-gloss";
+import { ReadingTimeTracker, type ActiveBook, type ReadingTimeFields } from "./reading-time";
 // Bundled 3C typefaces (OFL/Apache). Imported as base64 data URLs (see
 // esbuild.config.mjs `dataurl` loader) so they ship inside main.js and render
 // for BRAT testers, whose vaults never receive the loose fonts/ folder.
@@ -344,7 +346,7 @@ interface RenderUnit {
 	singlePage?: boolean;
 }
 
-interface ReaderPosition {
+interface ReaderPosition extends ReadingTimeFields {
 	unitIndex: number;
 	spread: number;
 	/** Last-active right-rail tab for this book. Persisted across sessions
@@ -4326,7 +4328,7 @@ export class ReaderView extends ItemView {
 		this.glossSurface.openInput("emphasise", rect, true);
 	}
 
-	private getCompanionDocPath(): string | null {
+	getCompanionDocPath(): string | null {
 		if (!this.book && !this.currentFile) return null;
 		return companionDocPath(this.book?.title || this.currentFile?.basename || "Book");
 	}
@@ -5241,6 +5243,13 @@ export default class ThirdMindReader extends Plugin {
 		);
 		this.addChild(this.pdfGloss);
 
+		this.addChild(new ReadingTimeTracker(
+			this.app,
+			() => this.activeBook(),
+			() => this.settings.bookPositions,
+			() => this.persistSettings(),
+		));
+
 		this.app.workspace.onLayoutReady(() => void this.repairCompanionSourceLinks());
 	}
 
@@ -5415,6 +5424,21 @@ export default class ThirdMindReader extends Plugin {
 	onunload(): void {
 		document.getElementById("tmr-bundled-fonts")?.remove();
 		clearCovers();
+	}
+
+	/** The book in the focused leaf — an epub in the reader, or a Library PDF in
+	 *  Obsidian's native viewer — for the reading-time clock. */
+	private activeBook(): ActiveBook | null {
+		const reader = this.activeReaderView();
+		if (reader) {
+			const path = reader.getState().file;
+			return path ? { path, companionPath: reader.getCompanionDocPath() } : null;
+		}
+		const view = this.app.workspace.getActiveViewOfType(FileView);
+		const file = view?.getViewType() === "pdf" ? view.file : null;
+		if (!file || !file.path.startsWith(libraryRootPath() + "/")) return null;
+		// Same key PDF Gloss writes its companion doc under.
+		return { path: file.path, companionPath: companionDocPath(file.basename) };
 	}
 
 	/** The reader view of the currently-active leaf, or null. Reader commands

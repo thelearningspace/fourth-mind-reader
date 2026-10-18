@@ -6,6 +6,7 @@ import { readEpubMeta } from "./epub";
 export interface BookProgress {
 	pct?: number;
 	lastRead?: number;
+	readingMs?: number;
 }
 
 /** A per-book display override. The epub file is never modified; these values
@@ -13,6 +14,8 @@ export interface BookProgress {
 export interface LibraryOverride {
 	title?: string;
 	author?: string;
+	/** Set by "Mark as read": counts the book finished whatever its progress. */
+	read?: boolean;
 }
 
 /** What the reader opens a book *with*: the plugin's own reader for epubs,
@@ -37,9 +40,13 @@ export interface LibraryBook {
 	collection: string;
 	/** 0..1 reading fraction, from `settings.bookPositions[path].pct` (0 if unread). */
 	progress: number;
+	/** The reader marked this book read by hand (see `LibraryOverride.read`). */
+	markedRead: boolean;
 	/** Epoch ms of last reading activity; 0 for never-opened books. Sort key for
 	 *  the shelf — see `sorted` in shelf-view.ts. */
 	lastRead: number;
+	/** Active reading time, ms; 0 if never tracked. See reading-time.ts. */
+	readingMs: number;
 	/** Annotation count — `> [!mode]-` callout headers in the companion doc. */
 	marks: number;
 	/** Whether a companion doc exists for this book (independent of mark count). */
@@ -188,6 +195,7 @@ export async function scanLibrary(
 		const { marks, hasCompanion } = await readMarks(vault, title);
 		const pct = positions[file.path]?.pct;
 		const lastRead = positions[file.path]?.lastRead;
+		const readingMs = positions[file.path]?.readingMs;
 		books.push({
 			path: file.path,
 			kind,
@@ -198,6 +206,8 @@ export async function scanLibrary(
 			collection: collectionOf(file.path),
 			progress: typeof pct === "number" ? Math.max(0, Math.min(1, pct)) : 0,
 			lastRead: typeof lastRead === "number" ? lastRead : 0,
+			readingMs: typeof readingMs === "number" ? readingMs : 0,
+			markedRead: ov?.read === true,
 			marks,
 			hasCompanion,
 		});

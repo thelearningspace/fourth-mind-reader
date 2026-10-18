@@ -19,10 +19,12 @@ import {
 	libraryRootPath,
 	scanLibrary,
 	type LibraryBook,
+	type LibraryOverride,
 } from "./library-scan";
 import { parseSavedHighlights } from "./gloss";
 import { EditBookDetailsModal, FolderNameModal } from "./library-modals";
 import { cachedCover, loadCover } from "./shelf-covers";
+import { formatReadingTime } from "./reading-time";
 
 /**
  * The Library, laid out as a shelf: what you are reading up top, then the
@@ -72,7 +74,7 @@ const HIGHLIGHTS_SHOWN = 30;
 const TINTS = 8;
 
 function statusOf(book: LibraryBook): Exclude<StatusFilter, "all"> {
-	if (book.progress >= FINISHED_AT) return "finished";
+	if (book.markedRead || book.progress >= FINISHED_AT) return "finished";
 	return book.progress > 0 || book.lastRead > 0 ? "reading" : "unread";
 }
 
@@ -512,7 +514,7 @@ export class LibraryView extends ItemView {
 				cy: 10,
 				r,
 				transform: "rotate(-90 10 10)",
-				"stroke-dasharray": `${circumference * book.progress} ${circumference}`,
+				"stroke-dasharray": `${circumference * (book.markedRead ? 1 : book.progress)} ${circumference}`,
 			},
 		});
 	}
@@ -605,6 +607,9 @@ export class LibraryView extends ItemView {
 			menu.addItem((i) => i.setTitle("Open annotations note").setIcon("file-text")
 				.onClick(() => void this.openCompanion(book)));
 		}
+		menu.addItem((i) => i.setTitle(book.markedRead ? "Mark as unread" : "Mark as read")
+			.setIcon(book.markedRead ? "book-x" : "book-check")
+			.onClick(() => void this.setMarkedRead(book, !book.markedRead)));
 		menu.addItem((i) => i.setTitle("Edit details…").setIcon("pencil")
 			.onClick(() => this.editDetails(book)));
 		menu.showAtMouseEvent(e);
@@ -620,25 +625,33 @@ export class LibraryView extends ItemView {
 	}
 
 	private editDetails(book: LibraryBook): void {
-		new EditBookDetailsModal(this.app, book, async (title, author) => {
-			this.applyOverride(book, title, author);
+		new EditBookDetailsModal(this.app, book, async (title, author, read) => {
+			this.applyOverride(book, title, author, read);
 			await this.plugin.saveSettings();
 			await this.refresh();
 		}).open();
 	}
 
+	private async setMarkedRead(book: LibraryBook, read: boolean): Promise<void> {
+		this.applyOverride(book, book.title, book.author, read);
+		await this.plugin.saveSettings();
+		await this.refresh();
+	}
+
 	/** Store a field only when it differs from the book's own metadata, so
 	 *  resetting a value removes the override instead of pinning it. */
-	private applyOverride(book: LibraryBook, title: string, author: string): void {
+	private applyOverride(book: LibraryBook, title: string, author: string, read: boolean): void {
 		const overrides = this.plugin.settings.libraryOverrides;
-		const next: { title?: string; author?: string } = { ...overrides[book.path] };
+		const next: LibraryOverride = { ...overrides[book.path] };
 		const t = title.trim();
 		if (t && t !== book.rawTitle) next.title = t;
 		else delete next.title;
 		const a = author.trim();
 		if (a !== book.rawAuthor) next.author = a;
 		else delete next.author;
-		if (next.title === undefined && next.author === undefined) delete overrides[book.path];
+		if (read) next.read = true;
+		else delete next.read;
+		if (next.title === undefined && next.author === undefined && !next.read) delete overrides[book.path];
 		else overrides[book.path] = next;
 	}
 
@@ -715,6 +728,7 @@ export class LibraryView extends ItemView {
 		};
 		stat(statusOf(book) === "finished" ? "Done" : percent(book), "read");
 		stat(String(book.marks), book.marks === 1 ? "highlight" : "highlights");
+		stat(formatReadingTime(book.readingMs), "reading time");
 		stat(book.lastRead ? moment(book.lastRead).fromNow(true) : "—", book.lastRead ? "since last read" : "never opened");
 		const added = this.addedAt(book);
 		if (added) stat(moment(added).format("D MMM YYYY"), "added");

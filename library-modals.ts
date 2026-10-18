@@ -9,15 +9,17 @@ import type { LibraryBook } from "./library-scan";
 export class EditBookDetailsModal extends Modal {
 	private titleValue: string;
 	private authorValue: string;
+	private readValue: boolean;
 
 	constructor(
 		app: App,
 		private book: LibraryBook,
-		private onSave: (title: string, author: string) => void | Promise<void>
+		private onSave: (title: string, author: string, read: boolean) => void | Promise<void>
 	) {
 		super(app);
 		this.titleValue = book.title;
 		this.authorValue = book.author;
+		this.readValue = book.markedRead;
 	}
 
 	onOpen(): void {
@@ -51,6 +53,11 @@ export class EditBookDetailsModal extends Modal {
 			});
 
 		new Setting(contentEl)
+			.setName("Read")
+			.setDesc("Counts the book as finished on the shelf, whatever page you stopped on.")
+			.addToggle((t) => t.setValue(this.readValue).onChange((v) => (this.readValue = v)));
+
+		new Setting(contentEl)
 			.addExtraButton((b) =>
 				b
 					.setIcon("rotate-ccw")
@@ -68,7 +75,7 @@ export class EditBookDetailsModal extends Modal {
 					.setButtonText("Save")
 					.setCta()
 					.onClick(async () => {
-						await this.onSave(this.titleValue, this.authorValue);
+						await this.onSave(this.titleValue, this.authorValue, this.readValue);
 						this.close();
 					})
 			);
