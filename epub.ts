@@ -30,6 +30,8 @@ export interface EpubCitation {
 
 export interface EpubBook {
 	title: string;
+	/** First dc:creator, or "" when the package names none. */
+	author: string;
 	spine: EpubManifestItem[];
 	manifest: Record<string, EpubManifestItem>;
 	toc: EpubTocItem[];
@@ -162,7 +164,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 
 	// 2. OPF → spine + manifest + title
 	const opfXml = await fs.readString(opfPath);
-	const { title, spine, manifest } = parseOpf(opfXml, opfDir);
+	const { title, author, spine, manifest } = parseOpf(opfXml, opfDir);
 
 	// 3. nav.xhtml → ToC (fall back to toc.ncx)
 	const navItem = Object.values(manifest).find(i => i.properties === "nav");
@@ -221,7 +223,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 	// 6. Pre-scan spine items for bibliography-style citations (e.g. "[78] Author...")
 	const citations = await parseCitationsFromSpine(fs, opfDir, spine);
 
-	return { title, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations };
+	return { title, author, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations };
 }
 
 /** Walk every spine item looking for paragraphs whose text begins with "[N] ".

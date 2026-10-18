@@ -92,6 +92,7 @@ import {
 } from "./highlights-pane";
 import { PdfGlossManager } from "./pdf-gloss";
 import { ReadingTimeTracker, type ActiveBook, type ReadingTimeFields } from "./reading-time";
+import { BookStatsModal } from "./book-stats";
 // Bundled 3C typefaces (OFL/Apache). Imported as base64 data URLs (see
 // esbuild.config.mjs `dataurl` loader) so they ship inside main.js and render
 // for BRAT testers, whose vaults never receive the loose fonts/ folder.
@@ -1398,6 +1399,10 @@ export class ReaderView extends ItemView {
 		setIcon(helpBtn, "circle-help");
 		helpBtn.ariaLabel = "How to use the reader";
 		this.registerDomEvent(helpBtn, "click", () => new HelpModal(this.app, this.plugin.settings).open());
+		const statsBtn = tocFooter.createEl("button", { cls: "tmr-toc-help-btn" });
+		setIcon(statsBtn, "bar-chart-2");
+		statsBtn.ariaLabel = "Reading stats";
+		this.registerDomEvent(statsBtn, "click", () => this.openStats());
 		const modeBtn = tocFooter.createEl("button", { cls: "tmr-toc-mode-btn" });
 		modeBtn.appendChild(sanitizeHTMLToDom(LOGO_3C_SVG));
 		this.registerDomEvent(modeBtn, "click", () => void this.toggleTmrMode());
@@ -1687,6 +1692,11 @@ export class ReaderView extends ItemView {
 			this.progressTipEl?.addClass("tmr-hidden");
 		});
 		this.globalPageEl = footer.createSpan({ cls: "tmr-global-page" });
+		this.globalPageEl.ariaLabel = "Reading stats";
+		this.registerDomEvent(this.globalPageEl, "click", (e) => {
+			e.stopPropagation();
+			this.openStats();
+		});
 		// Hangs off the root, not the footer: the footer *is* the bar on a phone
 		// and moves and resizes with it, while this line has to hold still
 		// relative to the screen (above the bar, then below the navbar).
@@ -2716,12 +2726,45 @@ export class ReaderView extends ItemView {
 		if (this.currentSpread < unit.spreadCount - 1) {
 			this.goToSpread(this.currentSpread + 1);
 			this.registerReadingTurn();
+			this.notePagedForward();
 			return;
 		}
 		if (this.currentUnitIndex < this.units.length - 1) {
 			await this.mountCurrentUnit(this.currentUnitIndex + 1, 0);
 			this.registerReadingTurn();
+			this.notePagedForward();
 		}
+	}
+
+	/** Credit one forward page turn toward the reading-speed estimate. Only
+	 *  turns count: a TOC or search jump covers ground nobody read. Persisted
+	 *  with the position save the turn already schedules. */
+	private notePagedForward(): void {
+		const path = this.currentFile?.path;
+		if (!path || this.totalSpreads <= 1) return;
+		const entry = (this.plugin.settings.bookPositions[path] ??= {});
+		entry.pagedPct = (entry.pagedPct ?? 0) + 1 / (this.totalSpreads - 1);
+	}
+
+	/** Open the per-book stats panel for the current position. */
+	openStats(): void {
+		const path = this.currentFile?.path;
+		if (!path || !this.book) return;
+		const override = this.plugin.settings.libraryOverrides[path];
+		const sectionIdx = this.getCurrentSectionIndex();
+		const sectionStart = this.sectionStartSpreads[sectionIdx] ?? 0;
+		const sectionCount = Math.max(1, this.sectionSpreadCounts[sectionIdx] ?? 1);
+		const localPage = Math.min(sectionCount, Math.max(1, this.getGlobalSpread() - sectionStart + 1));
+		new BookStatsModal(this.app, {
+			path,
+			title: override?.title || this.book.title,
+			author: override?.author ?? this.book.author,
+			bookPct: this.getProgressFraction(),
+			chapterLabel: this.sections[sectionIdx]?.label ?? "",
+			chapterPct: localPage / sectionCount,
+			chapterLeft: (sectionCount - localPage) / Math.max(1, this.totalSpreads - 1),
+			fields: this.plugin.settings.bookPositions[path],
+		}).open();
 	}
 
 	async retreat(): Promise<void> {
@@ -5468,6 +5511,16 @@ export default class ThirdMindReader extends Plugin {
 			id: "show-reader-help",
 			name: "How to use the reader",
 			callback: () => new HelpModal(this.app, this.settings).open(),
+		});
+		this.addCommand({
+			id: "show-reading-stats",
+			name: "Show reading stats for this book",
+			checkCallback: (checking) => {
+				const v = this.activeReaderView();
+				if (!v) return false;
+				if (!checking) v.openStats();
+				return true;
+			},
 		});
 		this.addCommand({
 			id: "open-annotations",

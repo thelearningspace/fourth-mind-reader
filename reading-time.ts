@@ -13,6 +13,18 @@ export interface ReadingTimeFields {
 	readingMs?: number;
 	/** Active reading time per local day (`YYYY-MM-DD` → ms). */
 	readingDays?: Record<string, number>;
+	/** Sittings with this book: runs of credited time with no gap longer than
+	 *  `SESSION_GAP_MS`. Counted from when session tracking began. */
+	sessionCount?: number;
+	/** Reading time credited since session tracking began, ms. Unlike
+	 *  `readingMs` it never includes older totals, so it pairs with
+	 *  `sessionCount` and `pagedPct`. */
+	sessionMs?: number;
+	/** Epoch ms of the last credited tick — the end of the latest session. */
+	lastSessionEnd?: number;
+	/** Fraction of the book covered by forward page turns (not jumps), summed
+	 *  since session tracking began. Over `sessionMs` it is the reading speed. */
+	pagedPct?: number;
 }
 
 /** Frontmatter key carrying a book's total reading time in whole minutes, so
@@ -29,6 +41,13 @@ const IDLE_MS = 5 * 60_000;
 /** Credited time is persisted to data.json at most this often while reading;
  *  switching books or unloading flushes whatever is left. */
 const PERSIST_MS = 60_000;
+/** A break shorter than this continues the same session, so glancing at another
+ *  tab or app doesn't split one sitting into many. */
+const SESSION_GAP_MS = 10 * 60_000;
+/** Time-to-go estimates need this much timed reading, and `MIN_PAGED_PCT` of the
+ *  book turned through, before the speed they divide by is worth trusting. */
+const MIN_RATE_MS = 10 * 60_000;
+const MIN_PAGED_PCT = 0.005;
 
 /** Counts active reading time per book.
  *
@@ -117,6 +136,11 @@ export class ReadingTimeTracker extends Component {
 		const day = window.moment(now).format("YYYY-MM-DD");
 		const days = (entry.readingDays ??= {});
 		days[day] = (days[day] ?? 0) + elapsed;
+		if (entry.lastSessionEnd === undefined || now - entry.lastSessionEnd > SESSION_GAP_MS + TICK_MS) {
+			entry.sessionCount = (entry.sessionCount ?? 0) + 1;
+		}
+		entry.sessionMs = (entry.sessionMs ?? 0) + elapsed;
+		entry.lastSessionEnd = now;
 
 		this.unpersistedMs += elapsed;
 		if (this.unpersistedMs >= PERSIST_MS) {
@@ -154,6 +178,34 @@ export class ReadingTimeTracker extends Component {
 			console.error("[ThirdMindReader] reading-minutes write failed", err);
 		}
 	}
+}
+
+/** Reading speed as a fraction of the book per ms, or null until there is
+ *  enough timed reading to estimate it (see `MIN_RATE_MS`). */
+export function readingRate(fields: ReadingTimeFields | undefined): number | null {
+	const ms = fields?.sessionMs ?? 0;
+	const paged = fields?.pagedPct ?? 0;
+	if (ms < MIN_RATE_MS || paged < MIN_PAGED_PCT) return null;
+	return paged / ms;
+}
+
+/** Mean sitting length, ms, or null before the first session. */
+export function averageSessionMs(fields: ReadingTimeFields | undefined): number | null {
+	const n = fields?.sessionCount ?? 0;
+	return n > 0 ? (fields?.sessionMs ?? 0) / n : null;
+}
+
+/** "about 2 hours", "about 25 mins", "under a minute" — a time-to-go phrase.
+ *  Rounded coarsely because the speed behind it is an estimate. */
+export function formatTimeLeft(ms: number): string {
+	const minutes = ms / 60_000;
+	if (minutes < 1) return "under a minute";
+	if (minutes < 60) {
+		const m = Math.max(1, Math.round(minutes));
+		return `about ${m} min${m === 1 ? "" : "s"}`;
+	}
+	const h = Math.round(minutes / 30) / 2;
+	return `about ${h} hour${h === 1 ? "" : "s"}`;
 }
 
 /** "3h 12m", "45m", "<1m" — for the Library details panel. */

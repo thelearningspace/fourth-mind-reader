@@ -25,6 +25,7 @@ import { parseSavedHighlights } from "./gloss";
 import { EditBookDetailsModal, FolderNameModal } from "./library-modals";
 import { cachedCover, loadCover } from "./shelf-covers";
 import { formatReadingTime } from "./reading-time";
+import { figure, hours } from "./book-stats";
 
 /**
  * The Library, laid out as a shelf: what you are reading up top, then the
@@ -428,6 +429,7 @@ export class LibraryView extends ItemView {
 
 		const browsing = !this.search.trim() && this.kind === "all" && this.status === "all" && this.collection === null;
 		if (browsing) {
+			this.renderSummary(body);
 			const current = this.sorted(this.books.filter((b) => statusOf(b) === "reading"), "recent").slice(0, HERO_COUNT);
 			if (current.length) {
 				body.createDiv({ cls: "fmr-shelf-section", text: "Continue reading" });
@@ -457,6 +459,29 @@ export class LibraryView extends ItemView {
 			for (const book of visible) this.renderCard(grid, book);
 		}
 		this.contentEl.scrollTop = scroll;
+	}
+
+	/** Whole-library totals: share of books finished, how many, and all the
+	 *  reading time the tracker has counted. */
+	private renderSummary(parent: HTMLElement): void {
+		const finished = this.books.filter((b) => statusOf(b) === "finished").length;
+		const share = finished / this.books.length;
+		const totalMs = this.books.reduce((sum, b) => sum + b.readingMs, 0);
+
+		parent.createDiv({ cls: "fmr-shelf-section", text: "All books" });
+		const strip = parent.createDiv({ cls: "fmr-stats-summary" });
+		const donut = strip.createDiv({ cls: "fmr-stats-donut" });
+		const r = 15.9155; // circumference 100, so the dash length is the percent
+		const svg = donut.createSvg("svg", { attr: { viewBox: "0 0 36 36", "aria-hidden": "true" } });
+		svg.createSvg("circle", { cls: "fmr-stats-donut-track", attr: { cx: 18, cy: 18, r } });
+		svg.createSvg("circle", {
+			cls: "fmr-stats-donut-fill",
+			attr: { cx: 18, cy: 18, r, transform: "rotate(-90 18 18)", "stroke-dasharray": `${share * 100} 100` },
+		});
+		donut.createDiv({ cls: "fmr-stats-donut-value", text: `${Math.round(share * 100)}%` });
+		strip.createDiv({ cls: "fmr-stats-donut-label", text: "of your books are finished" });
+		figure(strip, String(finished), finished === 1 ? "Book finished" : "Books finished");
+		figure(strip, hours(totalMs), "Total hours of reading");
 	}
 
 	private renderCover(parent: HTMLElement, book: LibraryBook): HTMLElement {
