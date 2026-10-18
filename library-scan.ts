@@ -239,7 +239,8 @@ export function computeCollections(vault: Vault, order: string[]): string[] {
 	const root = vault.getAbstractFileByPath(libraryRootPath());
 	const folders = root instanceof TFolder
 		? root.children
-			.filter((c): c is TFolder => c instanceof TFolder && c.path !== annotationsFolderPath())
+			.filter((c): c is TFolder =>
+				c instanceof TFolder && c.path !== annotationsFolderPath() && !isExplodedEpub(c))
 			.map((c) => c.name)
 		: [];
 
@@ -250,6 +251,13 @@ export function computeCollections(vault: Vault, order: string[]): string[] {
 		.filter((c) => !ordered.includes(c))
 		.sort((a, b) => a.localeCompare(b));
 	return [...ordered, ...rest];
+}
+
+/** An unzipped book folder (see `detectExplodedEpubs`), not a collection. Same
+ *  probe, read from the vault tree so `computeCollections` stays synchronous. */
+function isExplodedEpub(folder: TFolder): boolean {
+	return folder.children.some((c) =>
+		c instanceof TFolder ? c.name === "META-INF" : c.name === "mimetype");
 }
 
 /**
