@@ -3563,7 +3563,61 @@ export class ReaderView extends ItemView {
 		if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
 		const range = sel.getRangeAt(0);
 		if (!this.spreadEl || !this.spreadEl.contains(range.startContainer)) return;
+		// Before the selection's rect is read: both the bar and the overlay
+		// are placed from it, so a stale geometry map strands both.
+		this.repairStaleGeometry("selection");
 		this.finalizeSelection(sel, range.getBoundingClientRect());
+	}
+
+	/** True when the browser's geometry for the column box disagrees with its own
+	 *  hit-testing. Seen on desktop: a selection made on the painted text resolved
+	 *  to the right words, yet `getClientRects()` put those words ~580px lower —
+	 *  overlay and GlossBar both landed there, and a window resize fixed it. Hit-
+	 *  testing is what the user sees, so ask it which glyph sits at a probe point
+	 *  and check that glyph's rect comes back near that same point. */
+	private geometryIsStale(): { probeY: number; rectY: number } | null {
+		if (!this.spreadEl || !this.contentNode) return null;
+		const view = this.spreadEl.getBoundingClientRect();
+		const x = view.left + view.width / 2;
+		// Several heights, since a probe can land in a paragraph gap or on an image.
+		for (const frac of [0.25, 0.5, 0.75]) {
+			const y = view.top + view.height * frac;
+			const caret = document.caretRangeFromPoint(x, y);
+			if (!caret || !this.contentNode.contains(caret.startContainer)) continue;
+			const node = caret.startContainer;
+			if (node.nodeType !== Node.TEXT_NODE) continue;
+			const len = node.textContent?.length ?? 0;
+			if (len === 0) continue;
+			const glyph = document.createRange();
+			const at = Math.min(caret.startOffset, len - 1);
+			glyph.setStart(node, at);
+			glyph.setEnd(node, at + 1);
+			const r = glyph.getBoundingClientRect();
+			if (r.height === 0) continue;
+			const rectY = (r.top + r.bottom) / 2;
+			// A line or two of slack: the caret snaps to the nearest glyph.
+			if (Math.abs(rectY - y) > r.height * 3) return { probeY: y, rectY };
+			return null;
+		}
+		return null;
+	}
+
+	/** Rebuild the column box's layout when its geometry has gone stale — the
+	 *  same reset a window resize gives, without changing any size. `display`
+	 *  round-trip discards the fragment tree outright; DOM, selection and the
+	 *  translateX all survive it. Logs either way so a recurrence is traceable
+	 *  from the console. */
+	private repairStaleGeometry(context: string): void {
+		const stale = this.geometryIsStale();
+		if (!stale || !this.contentNode) return;
+		console.warn(`[ThirdMindReader] stale layout geometry (${context})`, stale);
+		this.contentNode.style.display = "none";
+		void this.contentNode.offsetHeight;
+		this.contentNode.style.removeProperty("display");
+		void this.contentNode.offsetHeight;
+		const after = this.geometryIsStale();
+		if (after) console.warn("[ThirdMindReader] geometry still stale after rebuild", after);
+		else console.warn("[ThirdMindReader] geometry repaired");
 	}
 
 	/** Resolve a native selection to a stored `CursorRange`, paint the active
@@ -4120,6 +4174,7 @@ export class ReaderView extends ItemView {
 		this.contentNode.querySelectorAll(".tmr-saved-highlight-overlay").forEach((n) => n.remove());
 		if (this.savedHighlights.length === 0) return;
 
+		this.repairStaleGeometry("saved highlights");
 		const overlay = createDiv();
 		overlay.className = "tmr-saved-highlight-overlay";
 		const contentRect = this.contentNode.getBoundingClientRect();
