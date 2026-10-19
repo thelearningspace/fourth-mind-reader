@@ -17,6 +17,8 @@ import {
 	ANCHOR_PREFIX_LEN,
 	AnnotationPreview,
 	GLOSS_AI_MODES,
+	GLOSS_NOTE_MODES,
+	modeLabel,
 	GlossSurface,
 	type SavedHighlight,
 	appendCallout,
@@ -390,7 +392,7 @@ export class PdfGlossController extends Component {
 				const onPreview = (e.target as Element | null)?.closest(".tmr-annotation-preview");
 				const idx = preview.hoveredIdx;
 				const saved = onPreview && idx !== -1 ? this.saved[idx] : null;
-				if (saved?.mode === "emphasise") {
+				if (saved && GLOSS_NOTE_MODES.has(saved.mode)) {
 					this.beginEditNote(idx);
 					return;
 				}
@@ -701,9 +703,9 @@ export class PdfGlossController extends Component {
 			this.pane?.toggle();
 			return;
 		}
-		// GlossBar numeric shortcuts (1–5), live only while the bar is up and no
+		// GlossBar numeric shortcuts (1–9), live only while the bar is up and no
 		// input has focus. `shortcutMode` already accounts for Lite mode.
-		if (!/^[1-5]$/.test(e.key)) return;
+		if (!/^[1-9]$/.test(e.key)) return;
 		const mode = this.surface.shortcutMode(parseInt(e.key, 10));
 		if (!mode || !this.pending) return;
 		e.preventDefault();
@@ -735,7 +737,7 @@ export class PdfGlossController extends Component {
 		}
 		// Clicking an Emphasise highlight opens its note for editing (or adding),
 		// with a delete button alongside.
-		if (saved.mode === "emphasise") {
+		if (GLOSS_NOTE_MODES.has(saved.mode)) {
 			this.beginEditNote(idx, new DOMRect(e.clientX, e.clientY, 0, 0));
 			return;
 		}
@@ -790,7 +792,7 @@ export class PdfGlossController extends Component {
 		const rect = anchor.width || !fallback ? anchor : fallback;
 		this.preview.hide();
 		this.editingNoteIdx = idx;
-		this.surface?.openInput("emphasise", rect, true, {
+		this.surface?.openInput(saved.mode, rect, true, {
 			initial: saved.userText,
 			onDelete: () => {
 				this.dismiss();
@@ -965,7 +967,7 @@ export class PdfGlossController extends Component {
 				userText,
 				sourceLink,
 			}));
-			new Notice(`${modeId[0].toUpperCase()}${modeId.slice(1)} saved`);
+			new Notice(`${modeLabel(modeId)} saved`);
 			// Paint it now rather than waiting on the vault `modify` event, which
 			// is debounced and would leave the new highlight invisible for a beat.
 			await this.reloadHighlights();

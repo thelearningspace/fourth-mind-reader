@@ -60,8 +60,11 @@ const STATUSES: { id: StatusFilter; label: string }[] = [
 ];
 const MODE_LABELS: Record<string, string> = {
 	emphasise: "Emphasise",
+	query: "Question",
+	discuss: "Discuss",
+	definition: "Definition",
 	explain: "Explain",
-	exclaim: "Exclaim",
+	exclaim: "Ask AI",
 	examine: "Examine",
 	enquiry: "Enquiry",
 };

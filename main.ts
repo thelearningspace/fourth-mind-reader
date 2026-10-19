@@ -58,9 +58,12 @@ import { type LibraryOverride, invalidateMetaCache, configureLibraryPaths, libra
 import {
 	ANCHOR_PREFIX_LEN,
 	AnnotationPreview,
+	ANNOTATION_MODES,
 	BOOKMARK_MODE,
 	GLOSS_AI_MODES,
 	GLOSS_MODES,
+	GLOSS_NOTE_MODES,
+	modeLabel,
 	GlossSurface,
 	appendCallout,
 	applyGlossTheme,
@@ -393,6 +396,9 @@ interface HelpRow {
 
 const GLOSS_HELP_DESC: Record<string, string> = {
 	emphasise: "Plain highlight with annotation",
+	query: "Highlight with a question",
+	discuss: "Highlight to discuss",
+	definition: "Highlight a definition",
 	exclaim: "Capture a reaction as first AI turn",
 	explain: "Ask AI to clarify",
 	examine: "Ask the AI to explore, with citations",
@@ -401,7 +407,7 @@ const GLOSS_HELP_DESC: Record<string, string> = {
 
 /** Built from `GLOSS_MODES` rather than restated, so the help sheet cannot list
  *  a mode, colour, icon or order the GlossBar doesn't have. The numeric keys are
- *  positional for the same reason — `1`–`5` are bound by tile index. */
+ *  positional for the same reason — `1`–`9` are bound by tile index. */
 function glossHelpRows(touch: boolean): HelpRow[] {
 	return [
 		{ key: "Select Text", desc: "Surfaces the Gloss toolbar over your selection" },
@@ -1044,11 +1050,11 @@ export class ReaderView extends ItemView {
 			// While a text field (gloss input, note editor, chat box, search…) has
 			// focus, keystrokes belong to it: navigation and shortcuts yield.
 			const typing = isTextInputFocused();
-			// GlossBar numeric shortcuts (1–5): only over a live selection.
+			// GlossBar numeric shortcuts (1–9): only over a live selection.
 			if (
 				!typing &&
 				!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey &&
-				/^[1-5]$/.test(e.key)
+				/^[1-9]$/.test(e.key)
 			) {
 				const mode = this.glossShortcutMode(parseInt(e.key, 10));
 				if (mode) {
@@ -1938,7 +1944,7 @@ export class ReaderView extends ItemView {
 			if (overlap) {
 				row.dataset.glossMode = overlap.mode;
 				const iconEl = row.createSpan({ cls: "tmr-book-search-row-icon" });
-				const modeMeta = GLOSS_MODES.find((m) => m.id === overlap.mode);
+				const modeMeta = ANNOTATION_MODES.find((m) => m.id === overlap.mode);
 				if (modeMeta) setIcon(iconEl, modeMeta.icon);
 			}
 			const rowBody = row.createDiv({ cls: "tmr-book-search-row-body" });
@@ -3917,7 +3923,7 @@ export class ReaderView extends ItemView {
 		});
 		this.renderSavedHighlights();
 		if (isAiMode) void this.pane.syncAiPendingFlag();
-		new Notice(`${modeId[0].toUpperCase()}${modeId.slice(1)} saved`);
+		new Notice(`${modeLabel(modeId)} saved`);
 		// The initial AI call for AI-bearing modes is fired by `onGlossSubmit`
 		// once the Conversations card is open, so the first turn streams into the
 		// live log just like every follow-up turn.
@@ -4319,7 +4325,7 @@ export class ReaderView extends ItemView {
 			return true;
 		}
 
-		if (saved.mode === "emphasise") {
+		if (GLOSS_NOTE_MODES.has(saved.mode)) {
 			this.beginEditNote(matchedIdx, new DOMRect(e.clientX, e.clientY, 0, 0));
 			return true;
 		}
@@ -4333,7 +4339,7 @@ export class ReaderView extends ItemView {
 	private openConversationFromPreview(): void {
 		const idx = this.annotationPreview.hoveredIdx;
 		const saved = idx === -1 ? null : this.savedHighlights[idx];
-		if (saved?.mode === "emphasise") {
+		if (saved && GLOSS_NOTE_MODES.has(saved.mode)) {
 			this.beginEditNote(idx);
 			return;
 		}
@@ -4374,7 +4380,7 @@ export class ReaderView extends ItemView {
 		const rect = anchor.width || !fallback ? anchor : fallback;
 		this.annotationPreview.hide();
 		this.editingNoteIdx = idx;
-		this.glossSurface.openInput("emphasise", rect, true, {
+		this.glossSurface.openInput(saved.mode, rect, true, {
 			initial: saved.userText,
 			onDelete: () => {
 				this.dismissGloss();
@@ -5920,9 +5926,7 @@ const APPEARANCE_SAMPLE = [
 
 const SYSTEM_PROMPT_MODES: { id: AiPromptMode; label: string; desc: string }[] = [
 	{ id: "explain", label: "Explain", desc: "Concise, knowledge-only answers." },
-	{ id: "examine", label: "Examine", desc: "In-depth research with cited footnotes." },
-	{ id: "exclaim", label: "Exclaim", desc: "Warm, empathetic response to a reaction." },
-	{ id: "enquiry", label: "Enquiry", desc: "Open-ended, conversational discussion." },
+	{ id: "exclaim", label: "Ask AI", desc: "Warm, empathetic response to a reaction." },
 ];
 
 /** A settings sub-page drawn imperatively. Unlike a declarative page it isn't
@@ -6216,7 +6220,7 @@ class TmrSettingTab extends PluginSettingTab {
 					this.appearancePage(),
 					{
 						name: "Enable AI features",
-						desc: "Master switch for the AI Gloss modes (Explain/Examine/Exclaim/Enquiry) and the Conversations pane. When off, the reader runs Lite: the GlossBar shows only Emphasise and the Highlights pane drops its tab bar. Auto-enables when you add your first provider.",
+						desc: "Master switch for the AI Gloss modes (Ask AI/Explain) and the Conversations pane. When off, the reader runs Lite: the GlossBar shows only Emphasise and the Highlights pane drops its tab bar. Auto-enables when you add your first provider.",
 						control: { type: "toggle", key: "aiFeaturesEnabled" },
 					},
 					this.aiPage(),

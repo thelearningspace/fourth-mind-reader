@@ -29,6 +29,27 @@ settings:
         opacity: false
         default: '#50805c'
     -
+        id: tmr-user-query
+        title: Question
+        type: variable-color
+        format: hex
+        opacity: false
+        default: '#3b6fd4'
+    -
+        id: tmr-user-discuss
+        title: Discuss
+        type: variable-color
+        format: hex
+        opacity: false
+        default: '#e0338a'
+    -
+        id: tmr-user-definition
+        title: Definition
+        type: variable-color
+        format: hex
+        opacity: false
+        default: '#7a52e0'
+    -
         id: tmr-user-exclaim
         title: Exclaim
         type: variable-color
@@ -148,6 +169,9 @@ settings:
 	--tmr-c-explain:      var(--tmr-user-explain, var(--color-yellow, #ac9c5d));
 	--tmr-c-examine:      var(--tmr-user-examine, var(--color-cyan, #6396a2));
 	--tmr-c-emphasise:    var(--tmr-user-emphasise, var(--color-green, #50805c));
+	--tmr-c-query:        var(--tmr-user-query, var(--color-blue, #3b6fd4));
+	--tmr-c-discuss:      var(--tmr-user-discuss, var(--color-pink, #e0338a));
+	--tmr-c-definition:   var(--tmr-user-definition, var(--color-purple, #7a52e0));
 	--tmr-c-enquiry:      var(--tmr-user-enquiry, #8c8787);
 	/* Bookmarks — DLS `--bookmark` / HipAnima. Obsidian's extended orange
 	   when 3C is off, the DLS shade itself when it's on (same in both 3C
@@ -230,6 +254,9 @@ settings:
 	--tmr-c-explain:      var(--tmr-user-explain, #ac9c5d);
 	--tmr-c-examine:      var(--tmr-user-examine, #6396a2);
 	--tmr-c-emphasise:    var(--tmr-user-emphasise, #50805c);
+	--tmr-c-query:        var(--tmr-user-query, #3b6fd4);
+	--tmr-c-discuss:      var(--tmr-user-discuss, #e0338a);
+	--tmr-c-definition:   var(--tmr-user-definition, #7a52e0);
 	--tmr-c-enquiry:      var(--tmr-user-enquiry, #8c8787);
 	--tmr-c-bookmark:     var(--tmr-user-bookmark, #90594e);
 
@@ -295,6 +322,9 @@ settings:
 	--tmr-c-explain:      var(--tmr-user-explain, #ac9c5d);
 	--tmr-c-examine:      var(--tmr-user-examine, #6396a2);
 	--tmr-c-emphasise:    var(--tmr-user-emphasise, #50805c);
+	--tmr-c-query:        var(--tmr-user-query, #3b6fd4);
+	--tmr-c-discuss:      var(--tmr-user-discuss, #e0338a);
+	--tmr-c-definition:   var(--tmr-user-definition, #7a52e0);
 	--tmr-c-enquiry:      var(--tmr-user-enquiry, #8c8787);
 	--tmr-c-bookmark:     var(--tmr-user-bookmark, #90594e);
 	/* Enquiry's neutral border reads too faint on light Empire surfaces — the
@@ -1125,6 +1155,9 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 	--tmr-c-explain:      var(--tmr-user-explain, var(--color-yellow, #ac9c5d));
 	--tmr-c-examine:      var(--tmr-user-examine, var(--color-cyan, #6396a2));
 	--tmr-c-emphasise:    var(--tmr-user-emphasise, var(--color-green, #50805c));
+	--tmr-c-query:        var(--tmr-user-query, var(--color-blue, #3b6fd4));
+	--tmr-c-discuss:      var(--tmr-user-discuss, var(--color-pink, #e0338a));
+	--tmr-c-definition:   var(--tmr-user-definition, var(--color-purple, #7a52e0));
 	--tmr-c-enquiry:      var(--tmr-user-enquiry, #8c8787);
 	/* Font tokens default to Obsidian's active fonts in non-3C mode. */
 	--font-primary:  var(--font-interface, sans-serif);
@@ -1143,6 +1176,9 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 	--tmr-c-explain:      var(--tmr-user-explain, #ac9c5d);
 	--tmr-c-examine:      var(--tmr-user-examine, #6396a2);
 	--tmr-c-emphasise:    var(--tmr-user-emphasise, #50805c);
+	--tmr-c-query:        var(--tmr-user-query, #3b6fd4);
+	--tmr-c-discuss:      var(--tmr-user-discuss, #e0338a);
+	--tmr-c-definition:   var(--tmr-user-definition, #7a52e0);
 	--tmr-c-enquiry:      var(--tmr-user-enquiry, #8c8787);
 	--font-primary:  "Rosarivo", var(--font-interface, sans-serif);
 	--font-secondary: "Labrada", var(--font-text, serif);
@@ -1224,7 +1260,6 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 /* ── 3C mode: filled tiles with contrasting DLS icons (GlossBar/Master/Updated).
    Fills use the theme-aware --tmr-c-* tokens (3C primitives); icon colours are
    the DLS contrast picks. `!important` beats Obsidian's default <button> bg. ── */
-.tmr-gloss-bar.tmr-3c-mode .tmr-gloss-tile[data-gloss-mode="emphasise"] { background: var(--tmr-c-emphasise) !important; color: #e1dee0; }
 .tmr-gloss-bar.tmr-3c-mode .tmr-gloss-tile[data-gloss-mode="exclaim"]   { background: var(--tmr-c-exclaim) !important;   color: #ac9c5d; }
 .tmr-gloss-bar.tmr-3c-mode .tmr-gloss-tile[data-gloss-mode="explain"]   { background: var(--tmr-c-explain) !important;   color: #605a4d; }
 .tmr-gloss-bar.tmr-3c-mode .tmr-gloss-tile[data-gloss-mode="examine"]   { background: var(--tmr-c-examine) !important;   color: #2e443d; }
@@ -1237,7 +1272,6 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
    fills onto an arbitrary theme (avoids contrast clashes). Exclaim uses its
    brighter `-icon` token so the dark Oh-Dear red still reads on any bar; hover
    is a neutral theme tint. ── */
-.tmr-gloss-bar:not(.tmr-3c-mode) .tmr-gloss-tile[data-gloss-mode="emphasise"] { color: var(--tmr-c-emphasise); }
 .tmr-gloss-bar:not(.tmr-3c-mode) .tmr-gloss-tile[data-gloss-mode="exclaim"]   { color: var(--tmr-c-exclaim-icon); }
 .tmr-gloss-bar:not(.tmr-3c-mode) .tmr-gloss-tile[data-gloss-mode="explain"]   { color: var(--tmr-c-explain); }
 .tmr-gloss-bar:not(.tmr-3c-mode) .tmr-gloss-tile[data-gloss-mode="examine"]   { color: var(--tmr-c-examine); }
@@ -1325,10 +1359,10 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-tile:hover {
 }
 .tmr-gloss-bar.tmr-3c-mode .tmr-gloss-sep { background: #97918736; } /* Prince-500 @ 21% */
 
-/* Lite mode (AI features off): only the Emphasise tile, no separator — but the
+/* Lite mode (AI features off): only the note circles, no separator — but the
    Extend control stays, since cross-page highlighting applies to Emphasise too. */
 .tmr-gloss-bar.tmr-gloss-lite .tmr-gloss-sep:not(.tmr-gloss-sep-extend),
-.tmr-gloss-bar.tmr-gloss-lite .tmr-gloss-tile:not([data-gloss-mode="emphasise"]):not(.tmr-gloss-tile-extend) {
+.tmr-gloss-bar.tmr-gloss-lite .tmr-gloss-tile-ai {
 	display: none;
 }
 
@@ -6797,4 +6831,74 @@ body.is-mobile .fmr-shelf .fmr-shelf-more {
 	padding: 0 var(--size-4-4);
 	color: var(--text-muted);
 	font-size: var(--font-ui-small);
+}
+
+/* ── Note circles: Emphasise, Question, Discuss, Definition ───────────────
+   The GlossBar draws the four note modes as colour circles rather than icon
+   tiles — the colour *is* the choice, and it's the colour the highlight will
+   be painted. Every per-mode rule for the three newer modes lives here. */
+.tmr-gloss-bar .tmr-gloss-tile-dot,
+.tmr-gloss-bar.tmr-3c-mode .tmr-gloss-tile-dot { background: transparent !important; }
+.tmr-gloss-dot {
+	display: block;
+	flex: none;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	transition: box-shadow 150ms ease;
+}
+body.is-mobile .tmr-gloss-dot { width: 20px; height: 20px; }
+.tmr-gloss-tile[data-gloss-mode="emphasise"]  .tmr-gloss-dot { background: var(--tmr-c-emphasise); }
+.tmr-gloss-tile[data-gloss-mode="query"]      .tmr-gloss-dot { background: var(--tmr-c-query); }
+.tmr-gloss-tile[data-gloss-mode="discuss"]    .tmr-gloss-dot { background: var(--tmr-c-discuss); }
+.tmr-gloss-tile[data-gloss-mode="definition"] .tmr-gloss-dot { background: var(--tmr-c-definition); }
+.tmr-gloss-tile-dot:hover .tmr-gloss-dot { box-shadow: 0 0 0 3px var(--background-modifier-border, #97918736); }
+
+.tmr-saved-highlight-rect[data-mode="query"]      { background: color-mix(in srgb, var(--tmr-c-query) var(--tmr-highlight-strength, 20%), transparent); }
+.tmr-saved-highlight-rect[data-mode="discuss"]    { background: color-mix(in srgb, var(--tmr-c-discuss) var(--tmr-highlight-strength, 20%), transparent); }
+.tmr-saved-highlight-rect[data-mode="definition"] { background: color-mix(in srgb, var(--tmr-c-definition) var(--tmr-highlight-strength, 20%), transparent); }
+.tmr-saved-highlight-rect-active[data-mode="query"]      { background: color-mix(in srgb, var(--tmr-c-query) 35%, transparent); box-shadow: 0 0 0 1px var(--tmr-c-query); }
+.tmr-saved-highlight-rect-active[data-mode="discuss"]    { background: color-mix(in srgb, var(--tmr-c-discuss) 35%, transparent); box-shadow: 0 0 0 1px var(--tmr-c-discuss); }
+.tmr-saved-highlight-rect-active[data-mode="definition"] { background: color-mix(in srgb, var(--tmr-c-definition) 35%, transparent); box-shadow: 0 0 0 1px var(--tmr-c-definition); }
+
+.tmr-gloss-input[data-gloss-mode="query"]::before      { background: var(--tmr-c-query); }
+.tmr-gloss-input[data-gloss-mode="discuss"]::before    { background: var(--tmr-c-discuss); }
+.tmr-gloss-input[data-gloss-mode="definition"]::before { background: var(--tmr-c-definition); }
+
+.tmr-gloss-tooltip[data-gloss-mode="query"]      { color: var(--tmr-c-query); }
+.tmr-gloss-tooltip[data-gloss-mode="discuss"]    { color: var(--tmr-c-discuss); }
+.tmr-gloss-tooltip[data-gloss-mode="definition"] { color: var(--tmr-c-definition); }
+
+.tmr-annotation-preview[data-gloss-mode="query"]      { border-left-color: var(--tmr-c-query); }
+.tmr-annotation-preview[data-gloss-mode="discuss"]    { border-left-color: var(--tmr-c-discuss); }
+.tmr-annotation-preview[data-gloss-mode="definition"] { border-left-color: var(--tmr-c-definition); }
+.tmr-annotation-preview[data-gloss-mode="query"]      .tmr-annotation-preview-mode { color: var(--tmr-c-query); }
+.tmr-annotation-preview[data-gloss-mode="discuss"]    .tmr-annotation-preview-mode { color: var(--tmr-c-discuss); }
+.tmr-annotation-preview[data-gloss-mode="definition"] .tmr-annotation-preview-mode { color: var(--tmr-c-definition); }
+
+.tmr-book-search-row[data-gloss-mode="query"]      { border-left-color: var(--tmr-c-query); }
+.tmr-book-search-row[data-gloss-mode="discuss"]    { border-left-color: var(--tmr-c-discuss); }
+.tmr-book-search-row[data-gloss-mode="definition"] { border-left-color: var(--tmr-c-definition); }
+.tmr-book-search-row[data-gloss-mode="query"]      .tmr-book-search-row-icon { color: var(--tmr-c-query); }
+.tmr-book-search-row[data-gloss-mode="discuss"]    .tmr-book-search-row-icon { color: var(--tmr-c-discuss); }
+.tmr-book-search-row[data-gloss-mode="definition"] .tmr-book-search-row-icon { color: var(--tmr-c-definition); }
+
+.tmr-highlights-item[data-gloss-mode="query"]      { border-left-color: var(--tmr-c-query); }
+.tmr-highlights-item[data-gloss-mode="discuss"]    { border-left-color: var(--tmr-c-discuss); }
+.tmr-highlights-item[data-gloss-mode="definition"] { border-left-color: var(--tmr-c-definition); }
+.tmr-highlights-item[data-gloss-mode="query"]      .tmr-highlights-item-icon { color: var(--tmr-c-query); }
+.tmr-highlights-item[data-gloss-mode="discuss"]    .tmr-highlights-item-icon { color: var(--tmr-c-discuss); }
+.tmr-highlights-item[data-gloss-mode="definition"] .tmr-highlights-item-icon { color: var(--tmr-c-definition); }
+
+.callout[data-callout="query"] {
+	--callout-color: #3b6fd4;
+	--callout-icon: lucide-circle-help;
+}
+.callout[data-callout="discuss"] {
+	--callout-color: #e0338a;
+	--callout-icon: lucide-messages-square;
+}
+.callout[data-callout="definition"] {
+	--callout-color: #7a52e0;
+	--callout-icon: lucide-book-open;
 }

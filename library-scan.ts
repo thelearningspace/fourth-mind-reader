@@ -108,7 +108,7 @@ export function companionDocPath(rawTitle: string): string {
 
 /** Each Gloss entry begins with a `> [!mode]-` header line (see `buildCallout`),
  *  so counting those headers gives the mark count without parsing anchors. */
-const CALLOUT_HEADER_RE = /^>\s*\[!(?:exclaim|explain|examine|emphasise|enquiry)\]/gim;
+const CALLOUT_HEADER_RE = /^>\s*\[!(?:exclaim|explain|examine|emphasise|enquiry|query|discuss|definition)\]/gim;
 
 /** Marks cache keyed by companion-doc path, validated against the doc's mtime so
  *  re-scans (and the live `modify` refresh) only re-read a doc that changed. */

@@ -23,9 +23,17 @@ import {
  *  Look, Prince-900, Dawn-800, Empire-600, Empire-800W) — semantic and
  *  theme-independent. See Feature Docs/Gloss - Feature Spec.md. */
 export const GLOSS_MODES = [
-	{ id: "emphasise", label: "Emphasise", icon: "highlighter" },
-	{ id: "exclaim",   label: "Exclaim",   icon: "circle-alert" },
+	{ id: "emphasise",  label: "Emphasise",  icon: "highlighter" },
+	{ id: "query",      label: "Question",   icon: "circle-help" },
+	{ id: "discuss",    label: "Discuss",    icon: "messages-square" },
+	{ id: "definition", label: "Definition", icon: "book-open" },
+	{ id: "exclaim",   label: "Ask AI",    icon: "circle-alert" },
 	{ id: "explain",   label: "Explain",   icon: "help-circle" },
+] as const;
+
+/** Modes dropped from the GlossBar. Kept so annotations already saved with
+ *  them still resolve an icon and label, and can still be edited. */
+export const RETIRED_GLOSS_MODES = [
 	{ id: "examine",   label: "Examine",   icon: "search" },
 	{ id: "enquiry",   label: "Enquiry",   icon: "message-circle-more" },
 ] as const;
@@ -40,11 +48,34 @@ export const BOOKMARK_MODE = { id: "bookmark", label: "Bookmark", icon: "bookmar
 
 /** Every mode that can appear in the Annotations list, for anything resolving a
  *  saved highlight's icon or label. GLOSS_MODES stays the tile list. */
-export const ANNOTATION_MODES = [...GLOSS_MODES, BOOKMARK_MODE];
+export const ANNOTATION_MODES = [...GLOSS_MODES, ...RETIRED_GLOSS_MODES, BOOKMARK_MODE];
+
+/** Modes whose note is the reader's own free text — no AI call. The GlossBar
+ *  draws these as colour circles; they stay live in Lite mode, and a click on
+ *  their saved highlight opens the note for editing. */
+export const GLOSS_NOTE_MODES = new Set(["emphasise", "query", "discuss", "definition"]);
+
+/** Text the note input opens holding, for the note modes that label their
+ *  note. `query` rather than `question` as the id: `[!question]` is one of
+ *  Obsidian's built-in callouts, and styling it would restyle every one. */
+export const GLOSS_NOTE_PREFIXES: Record<string, string> = {
+	query:      "Question: ",
+	discuss:    "Discuss: ",
+	definition: "Definition: ",
+};
+
+/** Display label for a saved highlight's mode, falling back to the raw id. */
+export function modeLabel(modeId: string): string {
+	return ANNOTATION_MODES.find((m) => m.id === modeId)?.label
+		?? modeId[0].toUpperCase() + modeId.slice(1);
+}
 
 /** Placeholder copy per gloss mode; exact phrasing from Feature Spec §Phase 2. */
 export const GLOSS_PLACEHOLDERS: Record<string, string> = {
 	emphasise: "your thought...",
+	query:      "your question...",
+	discuss:    "what to discuss...",
+	definition: "the definition...",
 	exclaim:   "what just happened...",
 	explain:   "what's unclear...",
 	examine:   "what do you want to explore...",
@@ -170,7 +201,7 @@ export function parseSavedHighlights(md: string): SavedHighlight[] {
 	const result: SavedHighlight[] = [];
 	// `bookmark` carries no `chars:` field, which is what marks its anchor as
 	// rangeless; everything downstream already tolerates the absent offsets.
-	const modeRe = /^>\s*\[!(exclaim|explain|examine|emphasise|enquiry|bookmark)\]/;
+	const modeRe = /^>\s*\[!(exclaim|explain|examine|emphasise|enquiry|query|discuss|definition|bookmark)\]/;
 	const anchorRe = /<!--\s*tmr-anchor\s+([^>]*?)-->/;
 	const fieldRe =
 		/(spine|para|chars|prefix|endPara|endChars|pdfPage|pdfSel):(?:"((?:[^"\\]|\\.)*)"|(\S+))/g;
@@ -636,8 +667,7 @@ export class AnnotationPreview extends Component {
 		const el = this.ensureEl();
 		el.empty();
 		el.dataset.glossMode = saved.mode;
-		el.createDiv({ cls: "tmr-annotation-preview-mode",
-			text: saved.mode[0].toUpperCase() + saved.mode.slice(1) });
+		el.createDiv({ cls: "tmr-annotation-preview-mode", text: modeLabel(saved.mode) });
 
 		const CHARS = PREVIEW_MAX_CHARS;
 		let body: string;
@@ -675,14 +705,14 @@ export class AnnotationPreview extends Component {
 		let actionable = false;
 		if (body.length > 0) {
 			setInlineMarkdown(el.createDiv({ cls: "tmr-annotation-preview-body" }), body);
-		} else if (this.onAddNote && saved.mode === "emphasise" && Platform.isMobile) {
+		} else if (this.onAddNote && GLOSS_NOTE_MODES.has(saved.mode) && Platform.isMobile) {
 			// Styled by the Annotations row's own class — same action, same look.
 			el.createDiv({ cls: "tmr-highlights-item-add-note", text: "+ Add a note" });
 			actionable = true;
 		} else {
 			const emptyText = GLOSS_AI_MODES.has(saved.mode) && isComplete
 				? "(no response)"
-				: this.onAddNote && saved.mode === "emphasise"
+				: this.onAddNote && GLOSS_NOTE_MODES.has(saved.mode)
 					? "Click to add a note"
 					: "No note yet — add one from the Highlights panel";
 			el.createDiv({
@@ -1047,8 +1077,8 @@ export class GlossSurface extends Component {
 		if (this.inputOpen) return null;
 		const mode = GLOSS_MODES[slot - 1];
 		if (!mode) return null;
-		// Lite mode hides the AI tiles — only Emphasise (1) stays live.
-		if (!this.opts.settings().aiFeaturesEnabled && mode.id !== "emphasise") return null;
+		// Lite mode hides the AI tiles — only the note circles stay live.
+		if (!this.opts.settings().aiFeaturesEnabled && !GLOSS_NOTE_MODES.has(mode.id)) return null;
 		if (this.opts.disabledModes?.().has(mode.id)) return null;
 		return mode.id;
 	}
@@ -1122,7 +1152,7 @@ export class GlossSurface extends Component {
 		// the host has nothing to anchor a submit to, and the input would collect
 		// text that silently goes nowhere.
 		if (!this.barVisible && !standalone) return;
-		if (!GLOSS_MODES.some((m) => m.id === modeId)) return;
+		if (![...GLOSS_MODES, ...RETIRED_GLOSS_MODES].some((m) => m.id === modeId)) return;
 		if (this.opts.disabledModes?.().has(modeId)) return;
 		this.activeMode = modeId;
 		this.barEl?.addClass("tmr-hidden");
@@ -1132,7 +1162,7 @@ export class GlossSurface extends Component {
 		panel.dataset.glossMode = modeId;
 		const input = panel.querySelector<HTMLInputElement>(".tmr-gloss-input-field");
 		if (input) {
-			input.value = edit?.initial ?? "";
+			input.value = edit?.initial ?? GLOSS_NOTE_PREFIXES[modeId] ?? "";
 			input.placeholder = GLOSS_PLACEHOLDERS[modeId] ?? "";
 		}
 		this.onDelete = edit?.onDelete ?? null;
@@ -1228,10 +1258,12 @@ export class GlossSurface extends Component {
 		if (this.barEl) return this.barEl;
 		const bar = document.body.createDiv({ cls: "tmr-gloss-bar tmr-hidden" });
 		GLOSS_MODES.forEach((mode, idx) => {
-			const tile = bar.createEl("button", { cls: "tmr-gloss-tile" });
+			const isNote = GLOSS_NOTE_MODES.has(mode.id);
+			const tile = bar.createEl("button", { cls: isNote ? "tmr-gloss-tile tmr-gloss-tile-dot" : "tmr-gloss-tile tmr-gloss-tile-ai" });
 			tile.dataset.glossMode = mode.id;
 			tile.dataset.shortcut = String(idx + 1);
-			setIcon(tile, mode.icon);
+			if (isNote) tile.createSpan({ cls: "tmr-gloss-dot" });
+			else setIcon(tile, mode.icon);
 			// Prevent mousedown from clearing the text selection before the click fires.
 			this.registerDomEvent(tile, "mousedown", (e: MouseEvent) => e.preventDefault());
 			this.registerDomEvent(tile, "click", (e: MouseEvent) => {
@@ -1250,9 +1282,10 @@ export class GlossSurface extends Component {
 				this.showTileTooltip(tile, mode.id, reason ?? `${mode.label} (${idx + 1})`);
 			});
 			this.registerDomEvent(tile, "mouseleave", () => this.hideTileTooltip());
-			// Separator stroke after the standard-highlight tile (Emphasise),
-			// before the AI tiles. Hidden in Lite mode along with those tiles.
-			if (idx === 0) bar.createDiv({ cls: "tmr-gloss-sep" });
+			// Separator stroke after the last note circle, before the AI tiles.
+			// Hidden in Lite mode along with those tiles.
+			const next = GLOSS_MODES[idx + 1];
+			if (isNote && next && !GLOSS_NOTE_MODES.has(next.id)) bar.createDiv({ cls: "tmr-gloss-sep" });
 		});
 
 		// Extend-across-pages action (not a gloss mode). Stays visible in Lite
@@ -1343,10 +1376,12 @@ export class GlossSurface extends Component {
 		const mode = this.activeMode;
 		if (!mode) return;
 		const input = this.inputEl?.querySelector<HTMLInputElement>(".tmr-gloss-input-field");
-		const text = input?.value.trim() ?? "";
-		// Non-emphasise modes require at least some text. Emphasise-with-empty
-		// writes a bare colour-flagged callout (spec §Phase 2, Emphasise).
-		if (mode !== "emphasise" && text.length === 0) {
+		let text = input?.value.trim() ?? "";
+		// A label prefix with nothing after it is no note at all.
+		if (text === GLOSS_NOTE_PREFIXES[mode]?.trim()) text = "";
+		// AI modes require at least some text. A note mode with none writes a
+		// bare colour-flagged callout (spec §Phase 2, Emphasise).
+		if (!GLOSS_NOTE_MODES.has(mode) && text.length === 0) {
 			input?.focus();
 			return;
 		}

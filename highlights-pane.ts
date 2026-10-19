@@ -40,6 +40,7 @@ import {
 	ANNOTATION_MODES,
 	BOOKMARK_MODE,
 	GLOSS_AI_MODES,
+	GLOSS_NOTE_MODES,
 	GLOSS_PLACEHOLDERS,
 	applyGlossTheme,
 	existingSourceLink,
@@ -770,12 +771,12 @@ export class HighlightsPane extends Component {
 			cls: "tmr-highlights-item-quote",
 			text: quote.length > 0 ? quote : "(no quote)",
 		});
-		// Emphasise and Bookmark notes are the reader's own free text, so they're
+		// Note-mode (Emphasise, Question, Discuss, Definition) and Bookmark notes are the reader's own free text, so they're
 		// click-to-edit here; other modes' "note" is the AI query, editable only
 		// in the chat surface. A bookmark fires from the reader chrome with no
 		// gloss input, so this pane is the only place to write its note.
 		const note = saved.userText.trim();
-		const noteEditable = saved.mode === "emphasise" || saved.mode === BOOKMARK_MODE.id;
+		const noteEditable = GLOSS_NOTE_MODES.has(saved.mode) || saved.mode === BOOKMARK_MODE.id;
 		if (this.editingNoteIdx === idx && noteEditable) {
 			this.renderNoteEditor(body, idx, saved.userText);
 		} else if (note.length > 0) {
@@ -946,7 +947,7 @@ export class HighlightsPane extends Component {
 			if (this.convChatEl?.dataset.conversationIdx !== undefined) this.closeConversation();
 			list.createDiv({
 				cls: "tmr-highlights-empty",
-				text: "No conversations yet — use Explain, Examine, Exclaim or Enquiry on a selection to start one.",
+				text: "No conversations yet — use Ask AI or Explain on a selection to start one.",
 			});
 			return;
 		}
@@ -1634,7 +1635,7 @@ export class HighlightsPane extends Component {
 
 		menu.addItem((item) =>
 			item
-				.setTitle("Show bare-flagged Exclaims/Enquiries")
+				.setTitle("Show bare-flagged Ask AI notes")
 				.setIcon("eye")
 				.setChecked(settings.showBareFlaggedConversations)
 				.onClick(async () => {
