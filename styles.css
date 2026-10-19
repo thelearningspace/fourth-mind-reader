@@ -1558,6 +1558,10 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-tile:hover {
 	background: rgba(106, 100, 88, 0.10);
 }
 
+.tmr-gloss-input-delete:hover {
+	color: var(--text-error, #c0392b) !important;
+}
+
 .tmr-gloss-input-submit .svg-icon {
 	width: 16px;
 	height: 16px;

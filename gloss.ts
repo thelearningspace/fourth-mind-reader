@@ -994,6 +994,8 @@ export class GlossSurface extends Component {
 	private tooltipEl: HTMLElement | null = null;
 	private linkSuggest: WikilinkSuggest | null = null;
 	private activeMode: string | null = null;
+	/** Set while the input edits a saved annotation; backs the delete button. */
+	private onDelete: (() => void) | null = null;
 	private kbdDispose: (() => void) | null = null;
 
 	constructor(private opts: GlossSurfaceOptions) {
@@ -1106,8 +1108,16 @@ export class GlossSurface extends Component {
 
 	/** `standalone` opens the panel with no GlossBar behind it, for a host that
 	 *  already knows what the text will be written to — editing a saved
-	 *  annotation, or a Lite-mode selection under `quickHighlightOn`. */
-	openInput(modeId: string, selectionRect: DOMRect, standalone = false): void {
+	 *  annotation, or a Lite-mode selection under `quickHighlightOn`.
+	 *
+	 *  `edit` marks the input as editing a saved annotation: it opens holding
+	 *  the existing note and shows a delete button wired to `onDelete`. */
+	openInput(
+		modeId: string,
+		selectionRect: DOMRect,
+		standalone = false,
+		edit?: { initial: string; onDelete: () => void },
+	): void {
 		// The raised bar *is* the "there is a live selection" signal — without it
 		// the host has nothing to anchor a submit to, and the input would collect
 		// text that silently goes nowhere.
@@ -1122,9 +1132,11 @@ export class GlossSurface extends Component {
 		panel.dataset.glossMode = modeId;
 		const input = panel.querySelector<HTMLInputElement>(".tmr-gloss-input-field");
 		if (input) {
-			input.value = "";
+			input.value = edit?.initial ?? "";
 			input.placeholder = GLOSS_PLACEHOLDERS[modeId] ?? "";
 		}
+		this.onDelete = edit?.onDelete ?? null;
+		panel.querySelector(".tmr-gloss-input-delete")?.toggleClass("tmr-hidden", !edit);
 		panel.removeClass("tmr-hidden");
 		// On touch the input has to clear the on-screen keyboard, which the
 		// selection rect knows nothing about; on desktop it still opens over the
@@ -1140,6 +1152,8 @@ export class GlossSurface extends Component {
 			this.positionFloater(panel, selectionRect);
 		}
 		input?.focus();
+		// Caret at the end, so an edit continues the note rather than prefixing it.
+		if (input) input.setSelectionRange(input.value.length, input.value.length);
 		this.opts.onInputOpen?.();
 	}
 
@@ -1157,6 +1171,7 @@ export class GlossSurface extends Component {
 		this.inputEl?.style.removeProperty("bottom");
 		this.linkSuggest?.close();
 		this.activeMode = null;
+		this.onDelete = null;
 	}
 
 	/** Keep the docked input above the on-screen keyboard. The measurement and
@@ -1271,6 +1286,14 @@ export class GlossSurface extends Component {
 		const input = panel.createEl("input", {
 			cls: "tmr-gloss-input-field",
 			attr: { type: "text" },
+		});
+		const deleteBtn = panel.createEl("button", { cls: "tmr-gloss-input-submit tmr-gloss-input-delete tmr-hidden" });
+		setIcon(deleteBtn, "trash-2");
+		deleteBtn.setAttribute("aria-label", "Delete annotation");
+		this.registerDomEvent(deleteBtn, "mousedown", (e) => e.preventDefault());
+		this.registerDomEvent(deleteBtn, "click", (e) => {
+			e.stopPropagation();
+			this.onDelete?.();
 		});
 		const submitBtn = panel.createEl("button", { cls: "tmr-gloss-input-submit" });
 		setIcon(submitBtn, "corner-down-left");

@@ -363,7 +363,7 @@ export class PdfGlossController extends Component {
 			onDismiss: () => this.dismiss(),
 		});
 		this.addChild(this.surface);
-		this.preview = new AnnotationPreview(this.settings, (idx) => this.beginAddNote(idx));
+		this.preview = new AnnotationPreview(this.settings, (idx) => this.beginEditNote(idx));
 		this.addChild(this.preview);
 		this.mountPane();
 
@@ -390,6 +390,10 @@ export class PdfGlossController extends Component {
 				const onPreview = (e.target as Element | null)?.closest(".tmr-annotation-preview");
 				const idx = preview.hoveredIdx;
 				const saved = onPreview && idx !== -1 ? this.saved[idx] : null;
+				if (saved?.mode === "emphasise") {
+					this.beginEditNote(idx);
+					return;
+				}
 				preview.hide();
 				if (saved) this.openConversationFor(idx, saved);
 			});
@@ -729,10 +733,10 @@ export class PdfGlossController extends Component {
 			this.preview?.showFor(idx, saved, e.clientX, e.clientY);
 			return;
 		}
-		// The preview's add-note line is only reachable if the pointer crosses the
-		// gap to it before the grace period expires, so the click does the same job.
-		if (saved.mode === "emphasise" && !saved.userText.trim()) {
-			this.beginAddNote(idx, new DOMRect(e.clientX, e.clientY, 0, 0));
+		// Clicking an Emphasise highlight opens its note for editing (or adding),
+		// with a delete button alongside.
+		if (saved.mode === "emphasise") {
+			this.beginEditNote(idx, new DOMRect(e.clientX, e.clientY, 0, 0));
 			return;
 		}
 		this.openConversationFor(idx, saved);
@@ -774,17 +778,25 @@ export class PdfGlossController extends Component {
 		this.editingNoteIdx = null;
 	}
 
-	/** Note input for a note-less Emphasise highlight: a desktop click on it, or
-	 *  the touch preview's "+ Add a note". `editingNoteIdx` is what routes the
-	 *  submit to that highlight instead of to a live selection. */
-	private beginAddNote(idx: number, fallback?: DOMRect): void {
-		if (!this.saved[idx] || !this.preview) return;
+	/** Note input for an Emphasise highlight, holding its current note and a
+	 *  delete button: a desktop click on it, or a tap on its touch preview.
+	 *  `editingNoteIdx` is what routes the submit to that highlight instead of
+	 *  to a live selection. */
+	private beginEditNote(idx: number, fallback?: DOMRect): void {
+		const saved = this.saved[idx];
+		if (!saved || !this.preview) return;
 		// A click can arrive with no preview raised, whose rect then measures zero.
 		const anchor = this.preview.anchorRect;
 		const rect = anchor.width || !fallback ? anchor : fallback;
 		this.preview.hide();
 		this.editingNoteIdx = idx;
-		this.surface?.openInput("emphasise", rect, true);
+		this.surface?.openInput("emphasise", rect, true, {
+			initial: saved.userText,
+			onDelete: () => {
+				this.dismiss();
+				void this.pane?.deleteHighlightAt(idx);
+			},
+		});
 	}
 
 	// ── Persistent highlight painting ───────────────────────────────────────

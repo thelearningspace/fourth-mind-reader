@@ -892,7 +892,7 @@ export class ReaderView extends ItemView {
 		this.addChild(this.glossSurface);
 		this.annotationPreview = new AnnotationPreview(
 			() => this.plugin.settings,
-			(idx) => this.beginAddNote(idx),
+			(idx) => this.beginEditNote(idx),
 		);
 		this.addChild(this.annotationPreview);
 		this.pane = new HighlightsPane(this.paneHost());
@@ -4319,8 +4319,8 @@ export class ReaderView extends ItemView {
 			return true;
 		}
 
-		if (saved.mode === "emphasise" && !saved.userText.trim()) {
-			this.beginAddNote(matchedIdx, new DOMRect(e.clientX, e.clientY, 0, 0));
+		if (saved.mode === "emphasise") {
+			this.beginEditNote(matchedIdx, new DOMRect(e.clientX, e.clientY, 0, 0));
 			return true;
 		}
 
@@ -4333,6 +4333,10 @@ export class ReaderView extends ItemView {
 	private openConversationFromPreview(): void {
 		const idx = this.annotationPreview.hoveredIdx;
 		const saved = idx === -1 ? null : this.savedHighlights[idx];
+		if (saved?.mode === "emphasise") {
+			this.beginEditNote(idx);
+			return;
+		}
 		this.hideAnnotationPreview();
 		if (saved) this.openConversationForHighlight(idx, saved);
 	}
@@ -4358,17 +4362,25 @@ export class ReaderView extends ItemView {
 		this.annotationPreview.hide();
 	}
 
-	/** Note input for a note-less Emphasise highlight: a desktop click on it, or
-	 *  the touch preview's "+ Add a note". `editingNoteIdx` is what routes the
-	 *  submit to that highlight instead of to a live selection. */
-	private beginAddNote(idx: number, fallback?: DOMRect): void {
-		if (!this.savedHighlights[idx]) return;
+	/** Note input for an Emphasise highlight, holding its current note and a
+	 *  delete button: a desktop click on it, or a tap on its touch preview.
+	 *  `editingNoteIdx` is what routes the submit to that highlight instead of
+	 *  to a live selection. */
+	private beginEditNote(idx: number, fallback?: DOMRect): void {
+		const saved = this.savedHighlights[idx];
+		if (!saved) return;
 		// A click can arrive with no preview raised, whose rect then measures zero.
 		const anchor = this.annotationPreview.anchorRect;
 		const rect = anchor.width || !fallback ? anchor : fallback;
 		this.annotationPreview.hide();
 		this.editingNoteIdx = idx;
-		this.glossSurface.openInput("emphasise", rect, true);
+		this.glossSurface.openInput("emphasise", rect, true, {
+			initial: saved.userText,
+			onDelete: () => {
+				this.dismissGloss();
+				void this.pane.deleteHighlightAt(idx);
+			},
+		});
 	}
 
 	getCompanionDocPath(): string | null {
