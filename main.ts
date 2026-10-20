@@ -25,8 +25,6 @@ import {
 	Modal,
 	Platform,
 	Scope,
-	AbstractInputSuggest,
-	TFolder,
 	apiVersion,
 	getLinkpath,
 	normalizePath,
@@ -96,6 +94,7 @@ import {
 import { PdfGlossManager } from "./pdf-gloss";
 import { ReadingTimeTracker, type ActiveBook, type ReadingTimeFields } from "./reading-time";
 import { BookStatsModal } from "./book-stats";
+import { ClaimModal, FolderSuggest } from "./claim-modal";
 // Bundled 3C typefaces (OFL/Apache). Imported as base64 data URLs (see
 // esbuild.config.mjs `dataurl` loader) so they ship inside main.js and render
 // for BRAT testers, whose vaults never receive the loose fonts/ folder.
@@ -152,6 +151,8 @@ interface ThirdMindReaderSettings {
 	 *  submitted no text and no AI turn followed (Exclaim/Enquiry edge cases).
 	 *  Toggled per-pane via the chat-box gear popover; off by default. */
 	showBareFlaggedConversations: boolean;
+	/** Folder the last "Make it a claim" note went to; empty is the vault root. */
+	claimFolder: string;
 	/** Mobile only: queue every AI submission into the companion doc for a
 	 *  desktop session to answer, even when a provider *is* reachable from the
 	 *  phone. Off by default — queueing is otherwise automatic and only happens
@@ -262,6 +263,7 @@ const DEFAULT_SETTINGS: ThirdMindReaderSettings = {
 	aiFeaturesEnabled: false,
 	streaming: true,
 	showBareFlaggedConversations: false,
+	claimFolder: "",
 	deferAiToDesktop: false,
 	systemPrompts: { ...DEFAULT_SYSTEM_PROMPTS },
 	replyTokens: { ...DEFAULT_REPLY_TOKENS },
@@ -455,32 +457,6 @@ function helpGroups(touch: boolean): { heading: string; rows: HelpRow[] }[] {
  *  3C DLS `HelpPopoup` component. Auto-opens once on first book open (gated by
  *  `seenOnce["help-modal"]`); re-openable any time from the help button beside the
  *  ToC toggle. Pure presentation — reads no plugin state. */
-/** Vault-folder autocomplete for the library-path inputs. */
-class FolderSuggest extends AbstractInputSuggest<TFolder> {
-	constructor(app: App, private input: HTMLInputElement) {
-		super(app, input);
-	}
-
-	protected getSuggestions(query: string): TFolder[] {
-		const q = query.trim().toLowerCase();
-		const annotations = annotationsFolderPath();
-		const folders = this.app.vault.getAllLoadedFiles()
-			.filter((f): f is TFolder => f instanceof TFolder && f.path !== "/"
-				&& f.path !== annotations && !f.path.startsWith(`${annotations}/`));
-		return folders.filter((f) => f.path.toLowerCase().includes(q)).slice(0, 50);
-	}
-
-	renderSuggestion(folder: TFolder, el: HTMLElement): void {
-		el.setText(folder.path);
-	}
-
-	selectSuggestion(folder: TFolder): void {
-		this.input.value = folder.path;
-		this.input.dispatchEvent(new Event("input"));
-		this.close();
-	}
-}
-
 /** Fires before the Library folder is created, so an existing epub folder can be
  *  named instead of getting a second one. Dismissing accepts the default. */
 class LibrarySetupModal extends Modal {
@@ -891,6 +867,7 @@ export class ReaderView extends ItemView {
 			settings: () => this.plugin.settings,
 			sourcePath: () => this.getCompanionDocPath() ?? "",
 			onExtend: () => this.beginExtend(),
+			onClaim: () => this.openClaim(),
 			onSubmit: (mode, text) => this.onGlossSubmit(mode, text),
 			onDismiss: () => this.dismissGloss(),
 			onInputOpen: () => this.syncScrim(),
@@ -3849,6 +3826,34 @@ export class ReaderView extends ItemView {
 	openGlossInput(modeId: string): void {
 		if (!this.activeHighlight || !this.activeSelectionRect) return;
 		this.glossSurface.openInput(modeId, this.activeSelectionRect);
+	}
+
+	/** Claim button: hand the live selection to the claim dialog, citing the
+	 *  book, the chapter it sits in, and the page as the reader numbers it. */
+	private openClaim(): void {
+		const highlight = this.activeHighlight;
+		const passage = this.activeSelectionText ?? "";
+		if (!highlight || !passage.trim() || !this.currentFile) return;
+		const spine = /^s(\d+)-/.exec(highlight.paraId);
+		const chapter = spine
+			? this.sections[this.sectionIndexBySpine[parseInt(spine[1], 10)] ?? 0]?.label ?? ""
+			: "";
+		const title = this.book?.title ?? this.currentFile.basename;
+		const source = [
+			`[[${this.currentFile.path}|${title}]]`,
+			chapter,
+			`p. ${this.getGlobalSpread() + 1}`,
+		].filter(Boolean).join(" · ");
+		this.dismissGloss();
+		new ClaimModal(this.app, {
+			passage,
+			source,
+			folder: this.plugin.settings.claimFolder,
+			onCreated: (folder) => {
+				this.plugin.settings.claimFolder = folder;
+				void this.plugin.saveSettings();
+			},
+		}).open();
 	}
 
 	/** A gloss tile was submitted. `text` is already trimmed and validated by the

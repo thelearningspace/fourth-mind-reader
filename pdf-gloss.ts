@@ -13,6 +13,7 @@
  */
 
 import { App, Component, Notice, Platform, TAbstractFile, TFile, View, setIcon, setTooltip } from "obsidian";
+import { ClaimModal } from "./claim-modal";
 import {
 	ANCHOR_PREFIX_LEN,
 	AnnotationPreview,
@@ -363,6 +364,7 @@ export class PdfGlossController extends Component {
 			// selections only in v1, so the tile is never built (spec decision 5).
 			onSubmit: (modeId, text) => this.persist(modeId, text),
 			onDismiss: () => this.dismiss(),
+			onClaim: () => this.openClaim(),
 		});
 		this.addChild(this.surface);
 		this.preview = new AnnotationPreview(this.settings, (idx) => this.beginEditNote(idx));
@@ -920,6 +922,33 @@ export class PdfGlossController extends Component {
 	private companionPath(): string | null {
 		const file = this.child.file;
 		return file ? companionDocPath(file.basename) : null;
+	}
+
+	/** Claim button: the dialog cites the PDF through the same native page +
+	 *  selection deep link its annotations carry. */
+	private openClaim(): void {
+		const pending = this.pending;
+		const file = this.child.file;
+		if (!pending || !file || !pending.text.trim()) return;
+		const subpath = `#page=${pending.page}&selection=${pending.sel.join(",")}`;
+		const alias = `${file.basename}, p. ${pending.page}`;
+		let source = `[[${file.path}${subpath}|${alias}]]`;
+		try {
+			source = this.child.getMarkdownLink?.(subpath, alias) ?? source;
+		} catch {
+			// Fall back to the hand-built wikilink.
+		}
+		const passage = pending.text;
+		this.dismiss();
+		new ClaimModal(this.app, {
+			passage,
+			source,
+			folder: this.settings().claimFolder,
+			onCreated: (folder) => {
+				this.settings().claimFolder = folder;
+				void this.saveSettings();
+			},
+		}).open();
 	}
 
 	private async persist(modeId: string, userText: string): Promise<void> {

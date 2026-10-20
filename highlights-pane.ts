@@ -159,6 +159,8 @@ export interface HighlightsPaneSettings extends GlossHostSettings {
 	/** Per-document record; only `pane` is the pane's business. Keyed by vault
 	 *  path, shared with the reader's position store. */
 	bookPositions: Record<string, { pane?: PaneTab }>;
+	/** Folder the last "Make it a claim" note went to; empty is the vault root. */
+	claimFolder: string;
 }
 
 /** Drag-to-resize for a slide-in pane. No painted handle — an invisible strip

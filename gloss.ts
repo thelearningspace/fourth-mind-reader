@@ -1000,6 +1000,8 @@ export interface GlossSurfaceOptions {
 	/** Cross-page extend. Omitted → the tile is never built, which is how PDFs
 	 *  opt out (same-page selections only in v1). */
 	onExtend?: () => void;
+	/** "Make it a claim" for the live selection. Omitted → no Claim button. */
+	onClaim?: () => void;
 	/** A tile was submitted with `text`. Empty text only reaches here for
 	 *  Emphasise — the other modes require content. */
 	onSubmit: (modeId: string, text: string) => void | Promise<void>;
@@ -1306,6 +1308,20 @@ export class GlossSurface extends Component {
 				this.showTileTooltip(extendTile, "extend", "Extend across pages");
 			});
 			this.registerDomEvent(extendTile, "mouseleave", () => this.hideTileTooltip());
+		}
+
+		// Claim: turns the selection into its own note, so it's no annotation
+		// mode — a labelled button rather than a coloured tile. Not AI, so it
+		// stays in Lite mode.
+		const onClaim = this.opts.onClaim;
+		if (onClaim) {
+			bar.createDiv({ cls: "tmr-gloss-sep tmr-gloss-sep-claim" });
+			const claimBtn = bar.createEl("button", { cls: "tmr-gloss-claim", text: "Claim" });
+			this.registerDomEvent(claimBtn, "mousedown", (e: MouseEvent) => e.preventDefault());
+			this.registerDomEvent(claimBtn, "click", (e: MouseEvent) => {
+				e.stopPropagation();
+				onClaim();
+			});
 		}
 
 		this.barEl = bar;
