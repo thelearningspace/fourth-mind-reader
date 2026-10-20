@@ -163,6 +163,8 @@ export interface HighlightsPaneSettings extends GlossHostSettings {
 	claimFolder: string;
 	/** Folder the last Note-button note went to; empty is the vault root. */
 	noteFolder: string;
+	/** Folder the last "Make it a link" note went to; empty is the vault root. */
+	linkFolder: string;
 }
 
 /** Drag-to-resize for a slide-in pane. No painted handle — an invisible strip

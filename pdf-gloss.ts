@@ -13,7 +13,7 @@
  */
 
 import { App, Component, Notice, Platform, TAbstractFile, TFile, View, setIcon, setTooltip } from "obsidian";
-import { ClaimModal, NoteModal } from "./note-modals";
+import { openPassageDialog, type PassageKind } from "./note-modals";
 import {
 	ANCHOR_PREFIX_LEN,
 	AnnotationPreview,
@@ -367,6 +367,7 @@ export class PdfGlossController extends Component {
 			onClaim: () => this.openPassageNote("claim"),
 			onNote: () => this.openPassageNote("note"),
 			onCopy: () => this.copySelection(),
+			onLink: () => this.openPassageNote("link"),
 		});
 		this.addChild(this.surface);
 		this.preview = new AnnotationPreview(this.settings, (idx) => this.beginEditNote(idx));
@@ -926,9 +927,9 @@ export class PdfGlossController extends Component {
 		return file ? companionDocPath(file.basename) : null;
 	}
 
-	/** Note / Claim buttons: the dialog cites the PDF through the same native
-	 *  page + selection deep link its annotations carry. */
-	private openPassageNote(kind: "note" | "claim"): void {
+	/** Note / Claim / Link buttons: the dialog cites the PDF through the same
+	 *  native page + selection deep link its annotations carry. */
+	private openPassageNote(kind: PassageKind): void {
 		const pending = this.pending;
 		const file = this.child.file;
 		if (!pending || !file || !pending.text.trim()) return;
@@ -942,17 +943,7 @@ export class PdfGlossController extends Component {
 		}
 		const passage = pending.text;
 		this.dismiss();
-		const key = kind === "note" ? "noteFolder" : "claimFolder";
-		const Dialog = kind === "note" ? NoteModal : ClaimModal;
-		new Dialog(this.app, {
-			passage,
-			source,
-			folder: this.settings()[key],
-			onCreated: (folder) => {
-				this.settings()[key] = folder;
-				void this.saveSettings();
-			},
-		}).open();
+		openPassageDialog(this.app, kind, passage, source, this.settings(), this.saveSettings);
 	}
 
 	/** Copy button: the selected text to the clipboard, then close the bar. */

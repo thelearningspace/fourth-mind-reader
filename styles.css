@@ -6922,6 +6922,7 @@ body.is-mobile .fmr-shelf .fmr-shelf-more {
 	box-shadow: none;
 	color: var(--text-normal);
 	font-size: 13px;
+	white-space: nowrap;
 	cursor: pointer;
 }
 .tmr-gloss-bar .tmr-gloss-action:hover { background: var(--background-modifier-hover, rgba(127, 127, 127, 0.15)) !important; }
@@ -6963,3 +6964,6 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-action { height: 40px; font-size: 14px;
 	color: var(--text-muted);
 	word-break: break-word;
 }
+.tmr-claim-modal select.tmr-link-relationship { width: 100%; }
+.tmr-claim-modal .tmr-link-reverse { padding: 8px 0 0; border-top: none; }
+.tmr-claim-modal .tmr-link-reverse .setting-item-description { word-break: break-word; }

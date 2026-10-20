@@ -1006,6 +1006,8 @@ export interface GlossSurfaceOptions {
 	onNote?: () => void;
 	/** Copy the live selection's text. Omitted → no Copy button. */
 	onCopy?: () => void;
+	/** Link the live selection to an idea note. Omitted → no Link button. */
+	onLink?: () => void;
 	/** A tile was submitted with `text`. Empty text only reaches here for
 	 *  Emphasise — the other modes require content. */
 	onSubmit: (modeId: string, text: string) => void | Promise<void>;
@@ -1326,6 +1328,7 @@ export class GlossSurface extends Component {
 			["Note", this.opts.onNote, "tmr-gloss-action-primary"],
 			["Copy", this.opts.onCopy],
 			["Claim", this.opts.onClaim],
+			["Link to an idea", this.opts.onLink],
 		];
 		if (actions.some(([, fn]) => fn)) {
 			const row = bar.createDiv({ cls: "tmr-gloss-actions" });
