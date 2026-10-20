@@ -6839,12 +6839,12 @@ body.is-mobile .fmr-shelf .fmr-shelf-more {
 .tmr-gloss-dot {
 	display: block;
 	flex: none;
-	width: 8px;
-	height: 8px;
+	/* Between the old 8px and ZettelFlow's 16px ink swatch, on every platform. */
+	width: 12px;
+	height: 12px;
 	border-radius: 50%;
 	transition: box-shadow 150ms ease;
 }
-body.is-mobile .tmr-gloss-dot { width: 10px; height: 10px; }
 .tmr-gloss-tile[data-gloss-mode="emphasise"]  .tmr-gloss-dot { background: var(--tmr-c-emphasise); }
 .tmr-gloss-tile[data-gloss-mode="query"]      .tmr-gloss-dot { background: var(--tmr-c-query); }
 .tmr-gloss-tile[data-gloss-mode="discuss"]    .tmr-gloss-dot { background: var(--tmr-c-discuss); }
