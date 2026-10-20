@@ -1117,8 +1117,9 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 	position: fixed;
 	z-index: 9998;
 	display: flex;
-	gap: 6px;
-	padding: 6px;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px;
 	background: var(--bg2, var(--background-primary));
 	border: 1px solid var(--ui1, var(--background-modifier-border));
 	border-radius: 15px;
@@ -1295,10 +1296,7 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 	   tiles and separator are siblings of the bar — so the same distribution goes
 	   straight on the bar. `gap` survives as the floor for the crowded case (the
 	   Extend control adds two more items). */
-	gap: 6px;
-	padding: 0 9px;
-	align-items: center;
-	justify-content: space-between;
+	padding: 8px 9px;
 	border-radius: 18px; /* --radius-L; body-scoped, so it can't read the token */
 	box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.35);
 }
@@ -1306,9 +1304,8 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 /* Lite mode leaves one or two live tiles. Spreading two items across a 313px
    bar reads as a layout fault rather than a distribution, so the short bar
    centres instead. */
-.tmr-gloss-bar.tmr-gloss-docked.tmr-gloss-lite {
-	justify-content: center;
-}
+.tmr-gloss-bar.tmr-gloss-docked .tmr-gloss-row { justify-content: space-between; }
+.tmr-gloss-bar.tmr-gloss-docked.tmr-gloss-lite .tmr-gloss-row { justify-content: center; }
 
 /* Touch tile: 39px painted, whether the bar is docked or floating.
    Scoped to the device rather than to the docked state, which is how this was
@@ -6903,24 +6900,41 @@ body.is-mobile .tmr-gloss-dot { width: 10px; height: 10px; }
 	--callout-icon: lucide-book-open;
 }
 
-/* ── Claim button + "Make it a claim" dialog ──────────────────────────────── */
-.tmr-gloss-bar .tmr-gloss-claim {
-	flex: none;
+/* ── GlossBar rows: circles + AI tiles on top, labelled actions below ────── */
+.tmr-gloss-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+/* Two columns, so the bar stays close to square rather than one long strip. */
+.tmr-gloss-actions {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+}
+.tmr-gloss-bar .tmr-gloss-action {
 	box-sizing: border-box;
-	height: 28px;
-	padding: 0 10px;
-	align-self: center;
-	border-radius: 8px;
+	height: 34px;
+	padding: 0 12px;
+	border-radius: 10px;
 	border: 1px solid var(--background-modifier-border, #97918736);
-	background: transparent !important;
+	background: var(--background-primary) !important;
 	box-shadow: none;
 	color: var(--text-normal);
-	font-size: 12px;
+	font-size: 13px;
 	cursor: pointer;
 }
-.tmr-gloss-bar .tmr-gloss-claim:hover { background: var(--background-modifier-hover, rgba(127, 127, 127, 0.15)) !important; }
-body.is-mobile .tmr-gloss-bar .tmr-gloss-claim { height: 32px; font-size: 13px; }
+.tmr-gloss-bar .tmr-gloss-action:hover { background: var(--background-modifier-hover, rgba(127, 127, 127, 0.15)) !important; }
+.tmr-gloss-bar .tmr-gloss-action-primary,
+.tmr-gloss-bar .tmr-gloss-action-primary:hover {
+	background: var(--interactive-accent) !important;
+	border-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+.tmr-gloss-bar .tmr-gloss-action-primary:hover { filter: brightness(1.08); }
+body.is-mobile .tmr-gloss-bar .tmr-gloss-action { height: 40px; font-size: 14px; }
 
+/* ── Note and "Make it a claim" dialogs ─────────────────────────────────────── */
 .tmr-claim-modal .modal-title {
 	font-size: var(--font-ui-small);
 	font-weight: var(--font-normal);
@@ -6938,6 +6952,7 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-claim { height: 32px; font-size: 13px; 
 .tmr-claim-modal input.tmr-claim-title,
 .tmr-claim-modal input.tmr-claim-folder { width: 100%; }
 .tmr-claim-modal textarea.tmr-claim-text { resize: vertical; min-height: 4.5em; }
+.tmr-claim-modal textarea.tmr-note-text { min-height: 8em; }
 .tmr-claim-passage {
 	padding-left: 12px;
 	border-left: 3px solid var(--interactive-accent);

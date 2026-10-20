@@ -1002,6 +1002,10 @@ export interface GlossSurfaceOptions {
 	onExtend?: () => void;
 	/** "Make it a claim" for the live selection. Omitted → no Claim button. */
 	onClaim?: () => void;
+	/** Write a free-standing note about the live selection. Omitted → no Note button. */
+	onNote?: () => void;
+	/** Copy the live selection's text. Omitted → no Copy button. */
+	onCopy?: () => void;
 	/** A tile was submitted with `text`. Empty text only reaches here for
 	 *  Emphasise — the other modes require content. */
 	onSubmit: (modeId: string, text: string) => void | Promise<void>;
@@ -1102,10 +1106,12 @@ export class GlossSurface extends Component {
 			// The tile click needs the selection rect, which positionFloater
 			// would normally have recorded.
 			this.lastRect = selectionRect;
+			// The bar is two rows now, taller than the navbar slot: it keeps the
+			// slot's width and bottom edge and grows upward over the page.
 			bar.style.left = `${slot.left}px`;
-			bar.style.top = `${slot.top}px`;
 			bar.style.width = `${slot.width}px`;
-			bar.style.height = `${slot.height}px`;
+			bar.style.removeProperty("height");
+			bar.style.top = `${slot.top + slot.height - bar.offsetHeight}px`;
 			return;
 		}
 		bar.style.removeProperty("width");
@@ -1259,9 +1265,12 @@ export class GlossSurface extends Component {
 	private ensureBar(): HTMLElement {
 		if (this.barEl) return this.barEl;
 		const bar = document.body.createDiv({ cls: "tmr-gloss-bar tmr-hidden" });
+		// Two rows: the colour circles and AI tiles on top, the actions that
+		// act on the selection as a whole (Note, Copy, Claim) underneath.
+		const top = bar.createDiv({ cls: "tmr-gloss-row" });
 		GLOSS_MODES.forEach((mode, idx) => {
 			const isNote = GLOSS_NOTE_MODES.has(mode.id);
-			const tile = bar.createEl("button", { cls: isNote ? "tmr-gloss-tile tmr-gloss-tile-dot" : "tmr-gloss-tile tmr-gloss-tile-ai" });
+			const tile = top.createEl("button", { cls: isNote ? "tmr-gloss-tile tmr-gloss-tile-dot" : "tmr-gloss-tile tmr-gloss-tile-ai" });
 			tile.dataset.glossMode = mode.id;
 			tile.dataset.shortcut = String(idx + 1);
 			if (isNote) tile.createSpan({ cls: "tmr-gloss-dot" });
@@ -1287,7 +1296,7 @@ export class GlossSurface extends Component {
 			// Separator stroke after the last note circle, before the AI tiles.
 			// Hidden in Lite mode along with those tiles.
 			const next = GLOSS_MODES[idx + 1];
-			if (isNote && next && !GLOSS_NOTE_MODES.has(next.id)) bar.createDiv({ cls: "tmr-gloss-sep" });
+			if (isNote && next && !GLOSS_NOTE_MODES.has(next.id)) top.createDiv({ cls: "tmr-gloss-sep" });
 		});
 
 		// Extend-across-pages action (not a gloss mode). Stays visible in Lite
@@ -1295,8 +1304,8 @@ export class GlossSurface extends Component {
 		// without a cross-page model (PDF) omit `onExtend` and get no tile.
 		const onExtend = this.opts.onExtend;
 		if (onExtend) {
-			bar.createDiv({ cls: "tmr-gloss-sep tmr-gloss-sep-extend" });
-			const extendTile = bar.createEl("button", { cls: "tmr-gloss-tile tmr-gloss-tile-extend" });
+			top.createDiv({ cls: "tmr-gloss-sep tmr-gloss-sep-extend" });
+			const extendTile = top.createEl("button", { cls: "tmr-gloss-tile tmr-gloss-tile-extend" });
 			setIcon(extendTile, "unfold-horizontal");
 			this.registerDomEvent(extendTile, "mousedown", (e: MouseEvent) => e.preventDefault());
 			this.registerDomEvent(extendTile, "click", (e: MouseEvent) => {
@@ -1310,18 +1319,25 @@ export class GlossSurface extends Component {
 			this.registerDomEvent(extendTile, "mouseleave", () => this.hideTileTooltip());
 		}
 
-		// Claim: turns the selection into its own note, so it's no annotation
-		// mode — a labelled button rather than a coloured tile. Not AI, so it
-		// stays in Lite mode.
-		const onClaim = this.opts.onClaim;
-		if (onClaim) {
-			bar.createDiv({ cls: "tmr-gloss-sep tmr-gloss-sep-claim" });
-			const claimBtn = bar.createEl("button", { cls: "tmr-gloss-claim", text: "Claim" });
-			this.registerDomEvent(claimBtn, "mousedown", (e: MouseEvent) => e.preventDefault());
-			this.registerDomEvent(claimBtn, "click", (e: MouseEvent) => {
-				e.stopPropagation();
-				onClaim();
-			});
+		// Actions on the selection as a whole — none of them annotation modes,
+		// so labelled buttons rather than coloured tiles. None is AI, so they all
+		// stay in Lite mode. A host that omits a callback gets no button.
+		const actions: [string, (() => void) | undefined, string?][] = [
+			["Note", this.opts.onNote, "tmr-gloss-action-primary"],
+			["Copy", this.opts.onCopy],
+			["Claim", this.opts.onClaim],
+		];
+		if (actions.some(([, fn]) => fn)) {
+			const row = bar.createDiv({ cls: "tmr-gloss-actions" });
+			for (const [label, fn, extra] of actions) {
+				if (!fn) continue;
+				const btn = row.createEl("button", { cls: `tmr-gloss-action ${extra ?? ""}`.trim(), text: label });
+				this.registerDomEvent(btn, "mousedown", (e: MouseEvent) => e.preventDefault());
+				this.registerDomEvent(btn, "click", (e: MouseEvent) => {
+					e.stopPropagation();
+					fn();
+				});
+			}
 		}
 
 		this.barEl = bar;

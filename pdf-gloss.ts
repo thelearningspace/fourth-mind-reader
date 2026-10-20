@@ -13,7 +13,7 @@
  */
 
 import { App, Component, Notice, Platform, TAbstractFile, TFile, View, setIcon, setTooltip } from "obsidian";
-import { ClaimModal } from "./claim-modal";
+import { ClaimModal, NoteModal } from "./note-modals";
 import {
 	ANCHOR_PREFIX_LEN,
 	AnnotationPreview,
@@ -364,7 +364,9 @@ export class PdfGlossController extends Component {
 			// selections only in v1, so the tile is never built (spec decision 5).
 			onSubmit: (modeId, text) => this.persist(modeId, text),
 			onDismiss: () => this.dismiss(),
-			onClaim: () => this.openClaim(),
+			onClaim: () => this.openPassageNote("claim"),
+			onNote: () => this.openPassageNote("note"),
+			onCopy: () => this.copySelection(),
 		});
 		this.addChild(this.surface);
 		this.preview = new AnnotationPreview(this.settings, (idx) => this.beginEditNote(idx));
@@ -924,9 +926,9 @@ export class PdfGlossController extends Component {
 		return file ? companionDocPath(file.basename) : null;
 	}
 
-	/** Claim button: the dialog cites the PDF through the same native page +
-	 *  selection deep link its annotations carry. */
-	private openClaim(): void {
+	/** Note / Claim buttons: the dialog cites the PDF through the same native
+	 *  page + selection deep link its annotations carry. */
+	private openPassageNote(kind: "note" | "claim"): void {
 		const pending = this.pending;
 		const file = this.child.file;
 		if (!pending || !file || !pending.text.trim()) return;
@@ -940,15 +942,28 @@ export class PdfGlossController extends Component {
 		}
 		const passage = pending.text;
 		this.dismiss();
-		new ClaimModal(this.app, {
+		const key = kind === "note" ? "noteFolder" : "claimFolder";
+		const Dialog = kind === "note" ? NoteModal : ClaimModal;
+		new Dialog(this.app, {
 			passage,
 			source,
-			folder: this.settings().claimFolder,
+			folder: this.settings()[key],
 			onCreated: (folder) => {
-				this.settings().claimFolder = folder;
+				this.settings()[key] = folder;
 				void this.saveSettings();
 			},
 		}).open();
+	}
+
+	/** Copy button: the selected text to the clipboard, then close the bar. */
+	private copySelection(): void {
+		const text = this.pending?.text ?? "";
+		if (!text.trim()) return;
+		this.dismiss();
+		navigator.clipboard.writeText(text).then(
+			() => new Notice("Copied to clipboard"),
+			() => new Notice("Couldn't copy the selection"),
+		);
 	}
 
 	private async persist(modeId: string, userText: string): Promise<void> {

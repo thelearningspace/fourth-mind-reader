@@ -161,6 +161,8 @@ export interface HighlightsPaneSettings extends GlossHostSettings {
 	bookPositions: Record<string, { pane?: PaneTab }>;
 	/** Folder the last "Make it a claim" note went to; empty is the vault root. */
 	claimFolder: string;
+	/** Folder the last Note-button note went to; empty is the vault root. */
+	noteFolder: string;
 }
 
 /** Drag-to-resize for a slide-in pane. No painted handle — an invisible strip

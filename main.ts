@@ -94,7 +94,7 @@ import {
 import { PdfGlossManager } from "./pdf-gloss";
 import { ReadingTimeTracker, type ActiveBook, type ReadingTimeFields } from "./reading-time";
 import { BookStatsModal } from "./book-stats";
-import { ClaimModal, FolderSuggest } from "./claim-modal";
+import { ClaimModal, FolderSuggest, NoteModal } from "./note-modals";
 // Bundled 3C typefaces (OFL/Apache). Imported as base64 data URLs (see
 // esbuild.config.mjs `dataurl` loader) so they ship inside main.js and render
 // for BRAT testers, whose vaults never receive the loose fonts/ folder.
@@ -153,6 +153,8 @@ interface ThirdMindReaderSettings {
 	showBareFlaggedConversations: boolean;
 	/** Folder the last "Make it a claim" note went to; empty is the vault root. */
 	claimFolder: string;
+	/** Folder the last Note-button note went to; empty is the vault root. */
+	noteFolder: string;
 	/** Mobile only: queue every AI submission into the companion doc for a
 	 *  desktop session to answer, even when a provider *is* reachable from the
 	 *  phone. Off by default — queueing is otherwise automatic and only happens
@@ -264,6 +266,7 @@ const DEFAULT_SETTINGS: ThirdMindReaderSettings = {
 	streaming: true,
 	showBareFlaggedConversations: false,
 	claimFolder: "",
+	noteFolder: "Fleeting Notes",
 	deferAiToDesktop: false,
 	systemPrompts: { ...DEFAULT_SYSTEM_PROMPTS },
 	replyTokens: { ...DEFAULT_REPLY_TOKENS },
@@ -867,7 +870,9 @@ export class ReaderView extends ItemView {
 			settings: () => this.plugin.settings,
 			sourcePath: () => this.getCompanionDocPath() ?? "",
 			onExtend: () => this.beginExtend(),
-			onClaim: () => this.openClaim(),
+			onClaim: () => this.openPassageNote("claim"),
+			onNote: () => this.openPassageNote("note"),
+			onCopy: () => this.copySelection(),
 			onSubmit: (mode, text) => this.onGlossSubmit(mode, text),
 			onDismiss: () => this.dismissGloss(),
 			onInputOpen: () => this.syncScrim(),
@@ -3828,9 +3833,9 @@ export class ReaderView extends ItemView {
 		this.glossSurface.openInput(modeId, this.activeSelectionRect);
 	}
 
-	/** Claim button: hand the live selection to the claim dialog, citing the
+	/** Note / Claim buttons: hand the live selection to the dialog, citing the
 	 *  book, the chapter it sits in, and the page as the reader numbers it. */
-	private openClaim(): void {
+	private openPassageNote(kind: "note" | "claim"): void {
 		const highlight = this.activeHighlight;
 		const passage = this.activeSelectionText ?? "";
 		if (!highlight || !passage.trim() || !this.currentFile) return;
@@ -3845,15 +3850,29 @@ export class ReaderView extends ItemView {
 			`p. ${this.getGlobalSpread() + 1}`,
 		].filter(Boolean).join(" · ");
 		this.dismissGloss();
-		new ClaimModal(this.app, {
+		const settings = this.plugin.settings;
+		const key = kind === "note" ? "noteFolder" : "claimFolder";
+		const Dialog = kind === "note" ? NoteModal : ClaimModal;
+		new Dialog(this.app, {
 			passage,
 			source,
-			folder: this.plugin.settings.claimFolder,
+			folder: settings[key],
 			onCreated: (folder) => {
-				this.plugin.settings.claimFolder = folder;
+				settings[key] = folder;
 				void this.plugin.saveSettings();
 			},
 		}).open();
+	}
+
+	/** Copy button: the selected text to the clipboard, then close the bar. */
+	private copySelection(): void {
+		const text = this.activeSelectionText ?? "";
+		if (!text.trim()) return;
+		this.dismissGloss();
+		navigator.clipboard.writeText(text).then(
+			() => new Notice("Copied to clipboard"),
+			() => new Notice("Couldn't copy the selection"),
+		);
 	}
 
 	/** A gloss tile was submitted. `text` is already trimmed and validated by the
