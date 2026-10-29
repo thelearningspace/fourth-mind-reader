@@ -40,7 +40,15 @@ export interface EpubBook {
 	opfDir: string;
 	cssCache: Record<string, string>;  // manifest-relative href → css text
 	citations: Record<number, EpubCitation>;  // citation number → text + navigable target
+	/** The print edition's pages, in reading order, from the nav `page-list`
+	 *  (or the NCX `pageList`). Empty when the book doesn't map its pages. */
+	pageList: EpubPageTarget[];
 	zip: JSZip;  // the book's backing archive — every raw read goes through it
+}
+
+export interface EpubPageTarget {
+	label: string;  // the printed page number, e.g. "12" or "xiv"
+	href: string;   // opf-relative "<spine-href>#<id>", or the bare spine href
 }
 
 export interface ResolvedEpubHref {
@@ -169,6 +177,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 	// 3. nav.xhtml → ToC (fall back to toc.ncx)
 	const navItem = Object.values(manifest).find(i => i.properties === "nav");
 	let toc: EpubTocItem[] = [];
+	let pageList: EpubPageTarget[] = [];
 	if (navItem && await fs.exists(opfDir + navItem.href)) {
 		const navXml = await fs.readString(opfDir + navItem.href);
 		toc = parseNav(navXml);
@@ -176,16 +185,18 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 			? navItem.href.substring(0, navItem.href.lastIndexOf("/") + 1)
 			: "";
 		toc = resolveTocHrefs(toc, navDir);
-	} else {
+		pageList = resolvePageHrefs(parseNavPageList(navXml), navDir);
+	}
+	if (toc.length === 0 || pageList.length === 0) {
 		// Try toc.ncx
 		const ncxItem = Object.values(manifest).find(i => i.mediaType === "application/x-dtbncx+xml");
 		if (ncxItem && await fs.exists(opfDir + ncxItem.href)) {
 			const ncxXml = await fs.readString(opfDir + ncxItem.href);
-			toc = parseNcx(ncxXml);
 			const ncxDir = ncxItem.href.includes("/")
 				? ncxItem.href.substring(0, ncxItem.href.lastIndexOf("/") + 1)
 				: "";
-			toc = resolveTocHrefs(toc, ncxDir);
+			if (toc.length === 0) toc = resolveTocHrefs(parseNcx(ncxXml), ncxDir);
+			if (pageList.length === 0) pageList = resolvePageHrefs(parseNcxPageList(ncxXml), ncxDir);
 		}
 	}
 	// If every chapter is nested under a single root wrapper entry (a common
@@ -223,7 +234,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 	// 6. Pre-scan spine items for bibliography-style citations (e.g. "[78] Author...")
 	const citations = await parseCitationsFromSpine(fs, opfDir, spine);
 
-	return { title, author, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations };
+	return { title, author, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations, pageList };
 }
 
 /** Walk every spine item looking for paragraphs whose text begins with "[N] ".
@@ -409,6 +420,9 @@ export async function renderSpineRange(
 		// Filter inline styles: keep layout properties, strip visual ones
 		filterInlineStyles(body);
 
+		// Tag print-page markers before the sanitiser drops `epub:type`.
+		markPrintPages(body, wrapper, item.href, book.pageList);
+
 		// Strip active/dangerous content (event handlers, scripts, framing/active
 		// elements, javascript: URLs, remote resources) before these nodes go live
 		// via importNode below. The parsed doc is inert until then, so this is the
@@ -460,6 +474,48 @@ export async function renderSpineRange(
 		// Yield to the browser so Obsidian stays responsive
 		await new Promise<void>(r => window.requestAnimationFrame(() => r()));
 	}
+}
+
+/** Stamp `data-tmr-page` on every element that starts a printed page: the
+ *  targets of the book's page list, plus inline pagebreak markers
+ *  (`epub:type="pagebreak"` / `role="doc-pagebreak"`). A page that starts at
+ *  the top of the file is stamped on the spine wrapper itself. */
+function markPrintPages(body: Element, wrapper: HTMLElement, href: string, pageList: EpubPageTarget[]): void {
+	body.querySelectorAll('[epub\\:type~="pagebreak"], [role~="doc-pagebreak"]').forEach((el) => {
+		const label = (el.getAttribute("title") ?? el.getAttribute("aria-label") ?? el.textContent ?? "").trim()
+			|| (/(\d+|[ivxlc]+)$/i.exec(el.id)?.[1] ?? "");
+		if (label) el.setAttribute("data-tmr-page", label);
+	});
+	for (const page of pageList) {
+		const [path, fragment] = page.href.split("#", 2);
+		if (path !== href) continue;
+		const el = fragment ? body.querySelector(`[id="${CSS.escape(fragment)}"]`) : null;
+		if (el) el.setAttribute("data-tmr-page", page.label);
+		else if (!fragment) wrapper.dataset.tmrPage = page.label;
+	}
+}
+
+/** The printed page `node` sits on: the label of the last page marker at or
+ *  before it inside `root`, or null if no marker precedes it there. */
+export function printPageAt(root: ParentNode, node: Node): string | null {
+	let label: string | null = null;
+	for (const marker of Array.from(root.querySelectorAll<HTMLElement>("[data-tmr-page]"))) {
+		if (!(marker.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+		label = marker.dataset.tmrPage ?? null;
+	}
+	return label;
+}
+
+/** Label of the last page-list page that starts in a spine item before
+ *  `spineIndex` — for a selection whose own spine item has no marker above it. */
+export function printPageBeforeSpine(book: EpubBook, spineIndex: number): string | null {
+	let label: string | null = null;
+	for (const page of book.pageList) {
+		const path = page.href.split("#", 1)[0];
+		const idx = book.spine.findIndex((item) => item.href === path);
+		if (idx >= 0 && idx < spineIndex) label = page.label;
+	}
+	return label;
 }
 
 /** Rewrite every image reference inside `root` to the pre-loaded blob URL.
@@ -1060,6 +1116,25 @@ function parseNav(xml: string): EpubTocItem[] {
 	return parseTocOl(ol);
 }
 
+function parseNavPageList(xml: string): EpubPageTarget[] {
+	const doc = new DOMParser().parseFromString(xml, "application/xhtml+xml");
+	const nav = doc.querySelector('nav[epub\\:type="page-list"], nav[*|type="page-list"]');
+	if (!nav) return [];
+	return Array.from(nav.querySelectorAll("a[href]"))
+		.map((a) => ({ label: a.textContent?.trim() ?? "", href: a.getAttribute("href") ?? "" }))
+		.filter((p) => p.label && p.href);
+}
+
+function parseNcxPageList(xml: string): EpubPageTarget[] {
+	const doc = new DOMParser().parseFromString(xml, "application/xml");
+	return Array.from(doc.querySelectorAll("pageList > pageTarget"))
+		.map((t) => ({
+			label: t.querySelector("navLabel > text")?.textContent?.trim() || t.getAttribute("value") || "",
+			href: t.querySelector("content")?.getAttribute("src") ?? "",
+		}))
+		.filter((p) => p.label && p.href);
+}
+
 function parseNcx(xml: string): EpubTocItem[] {
 	const doc = new DOMParser().parseFromString(xml, "application/xml");
 	const navMap = doc.querySelector("navMap");
@@ -1114,6 +1189,14 @@ function resolveTocHrefs(items: EpubTocItem[], baseDir: string): EpubTocItem[] {
 			href: resolvedHref,
 			children: resolveTocHrefs(item.children, baseDir),
 		};
+	});
+}
+
+function resolvePageHrefs(pages: EpubPageTarget[], baseDir: string): EpubPageTarget[] {
+	return pages.map((page) => {
+		const [path, fragment] = page.href.split("#", 2);
+		const resolvedPath = path ? resolveRelativePath(baseDir + path) : "";
+		return { ...page, href: fragment ? `${resolvedPath}#${fragment}` : resolvedPath };
 	});
 }
 

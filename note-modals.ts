@@ -5,7 +5,7 @@
  *  hosts, which differ only in how they describe the source.
  */
 
-import { AbstractInputSuggest, App, FuzzySuggestModal, Modal, Notice, Setting, TFile, TFolder, normalizePath } from "obsidian";
+import { AbstractInputSuggest, App, FuzzySuggestModal, Modal, Notice, Setting, TFile, TFolder, getAllTags, normalizePath } from "obsidian";
 import { annotationsFolderPath, sanitizeFileName } from "./library-scan";
 
 /** Vault-folder autocomplete. Hides the annotations folder, which belongs to
@@ -35,6 +35,46 @@ export class FolderSuggest extends AbstractInputSuggest<TFolder> {
 	}
 }
 
+/** Tag autocomplete for the Tags box: completes the word being typed from
+ *  the tags already used across the vault, most-used first. */
+class TagSuggest extends AbstractInputSuggest<string> {
+	private tags: string[];
+
+	constructor(app: App, private input: HTMLInputElement) {
+		super(app, input);
+		const counts = new Map<string, number>();
+		for (const file of app.vault.getMarkdownFiles()) {
+			const cache = app.metadataCache.getFileCache(file);
+			for (const tag of (cache && getAllTags(cache)) ?? []) {
+				const name = tag.replace(/^#/, "");
+				counts.set(name, (counts.get(name) ?? 0) + 1);
+			}
+		}
+		this.tags = [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b));
+	}
+
+	private currentWord(): string {
+		return /[^\s,]*$/.exec(this.input.value)?.[0].replace(/^#+/, "") ?? "";
+	}
+
+	protected getSuggestions(): string[] {
+		const q = this.currentWord().toLowerCase();
+		if (!q) return [];
+		const typed = new Set(this.input.value.split(/[\s,]+/).map((t) => t.replace(/^#+/, "")));
+		return this.tags.filter((t) => t.toLowerCase().includes(q) && !typed.has(t)).slice(0, 50);
+	}
+
+	renderSuggestion(tag: string, el: HTMLElement): void {
+		el.setText(tag);
+	}
+
+	selectSuggestion(tag: string): void {
+		this.input.value = this.input.value.replace(/[^\s,]*$/, `${tag} `);
+		this.input.dispatchEvent(new Event("input"));
+		this.close();
+	}
+}
+
 export interface PassageSource {
 	/** The selected text, verbatim. */
 	passage: string;
@@ -44,11 +84,21 @@ export interface PassageSource {
 	source: string;
 	/** Folder the dialog opens on — the last one used. Empty is the vault root. */
 	folder: string;
-	/** The note was created in `folder`; hosts remember it for next time. */
-	onCreated: (folder: string) => void;
+	/** `file` was created in `folder`; hosts remember the folder for next
+	 *  time and keep the passage highlighted in the book. */
+	onCreated: (folder: string, file: TFile) => void;
 	/** Extra line written under the Source line — the book citation, when
 	 *  Source is the linked idea rather than the book. */
 	extra?: string;
+	/** Where the passage comes from, written as the note's properties. */
+	cite: PassageCitation;
+}
+
+export interface PassageCitation {
+	/** Wikilink to the book, e.g. `[[Library/Range.epub|Range]]`. */
+	source: string;
+	/** Printed page or range ("12", "12–13"); empty when the book has none. */
+	page: string;
 }
 
 /** Longest default title. A whole paragraph makes a useless file name. */
@@ -63,6 +113,7 @@ function clip(text: string, max: number): string {
 abstract class PassageNoteModal extends Modal {
 	protected passage: string;
 	private folderEl: HTMLInputElement | null = null;
+	private tagsEl: HTMLInputElement | null = null;
 
 	constructor(app: App, protected src: PassageSource) {
 		super(app);
@@ -77,6 +128,28 @@ abstract class PassageNoteModal extends Modal {
 		const wrap = this.contentEl.createDiv({ cls: "tmr-claim-field" });
 		wrap.createDiv({ cls: "tmr-claim-label", text: label });
 		return wrap;
+	}
+
+	/** Tags box, written into the note's `tags` property. */
+	protected renderTags(initial = ""): void {
+		this.tagsEl = this.field("Tags").createEl("input", {
+			cls: "tmr-claim-tags",
+			attr: { type: "text", placeholder: "Separate with spaces or commas" },
+		});
+		this.tagsEl.value = initial;
+		new TagSuggest(this.app, this.tagsEl);
+	}
+
+	/** `source`, `page` and `tags` properties for the top of the note. */
+	private frontmatter(): string {
+		const tags = (this.tagsEl?.value ?? "")
+			.split(/[\s,]+/)
+			.map((t) => t.replace(/^#+/, "").replace(/[^\p{L}\p{N}_/-]/gu, ""))
+			.filter((t, i, all) => t && all.indexOf(t) === i);
+		const lines = ["---", `source: ${JSON.stringify(this.src.cite.source)}`];
+		if (this.src.cite.page) lines.push(`page: ${JSON.stringify(this.src.cite.page)}`);
+		lines.push(tags.length ? `tags:\n${tags.map((t) => `  - ${t}`).join("\n")}` : "tags: []", "---", "");
+		return lines.join("\n");
 	}
 
 	/** Passage, Source, Folder and the Cancel / confirm buttons. */
@@ -98,8 +171,15 @@ abstract class PassageNoteModal extends Modal {
 	}
 
 	/** Write `folder/title.md` holding `text`, the passage as a quote, the
-	 *  source line and any `lines` after it. Null if nothing was written. */
-	protected async save(text: string, rawTitle: string, kind: string, lines: string[] = []): Promise<TFile | null> {
+	 *  source line and any `lines` after it, under the citation properties when
+	 *  `withProperties`. Null if nothing was written. */
+	protected async save(
+		text: string,
+		rawTitle: string,
+		kind: string,
+		lines: string[] = [],
+		withProperties = false,
+	): Promise<TFile | null> {
 		const title = sanitizeFileName(rawTitle.replace(/…$/, "")).replace(/^\.+/, "") || kind;
 		const folder = (this.folderEl?.value ?? "").trim().replace(/^\/+|\/+$/g, "");
 		if (folder && !(this.app.vault.getAbstractFileByPath(normalizePath(folder)) instanceof TFolder)) {
@@ -109,7 +189,7 @@ abstract class PassageNoteModal extends Modal {
 		const path = this.freePath(folder, title);
 		const quote = this.src.passage.trim().split(/\r?\n/).map((l) => `> ${l}`).join("\n");
 		const tail = [`Source: ${this.src.source}`, ...lines, this.src.extra ?? ""].filter(Boolean);
-		const body = `${text}\n\n${quote}\n\n${tail.join("\n")}\n`;
+		const body = `${withProperties ? this.frontmatter() : ""}${text}\n\n${quote}\n\n${tail.join("\n")}\n`;
 		let file: TFile;
 		try {
 			file = await this.app.vault.create(path, body);
@@ -118,9 +198,10 @@ abstract class PassageNoteModal extends Modal {
 			new Notice(`Fourth Mind Reader: failed to create the ${kind.toLowerCase()} note`);
 			return null;
 		}
-		this.src.onCreated(folder);
+		this.src.onCreated(folder, file);
 		new Notice(`${kind} created: ${path}`);
 		this.close();
+		await this.app.workspace.getLeaf("tab").openFile(file);
 		return file;
 	}
 
@@ -146,6 +227,7 @@ export class NoteModal extends PassageNoteModal {
 			cls: "tmr-claim-title",
 			attr: { type: "text", placeholder: "First line of the note" },
 		});
+		this.renderTags();
 		this.renderTail("Save", () => {
 			const text = noteEl.value.trim();
 			if (!text) {
@@ -153,7 +235,7 @@ export class NoteModal extends PassageNoteModal {
 				return;
 			}
 			const title = titleEl.value.trim() || clip(text.split(/\r?\n/, 1)[0], TITLE_MAX);
-			void this.save(text, title, "Note");
+			void this.save(text, title, "Note", [], true);
 		});
 		noteEl.focus();
 	}
@@ -170,13 +252,14 @@ export class ClaimModal extends PassageNoteModal {
 		claimEl.rows = 3;
 		const titleEl = this.field("Title").createEl("input", { cls: "tmr-claim-title", attr: { type: "text" } });
 		titleEl.value = clip(this.passage, TITLE_MAX);
+		this.renderTags("claim ");
 		this.renderTail("Create", () => {
 			const claim = claimEl.value.trim();
 			if (!claim) {
 				new Notice("Write the claim first");
 				return;
 			}
-			void this.save(claim, titleEl.value, "Claim");
+			void this.save(claim, titleEl.value, "Claim", [], true);
 		});
 		claimEl.focus();
 		claimEl.select();
@@ -362,17 +445,21 @@ export function openPassageDialog(
 	kind: PassageKind,
 	passage: string,
 	source: string,
+	cite: PassageCitation,
 	folders: PassageFolders,
 	save: () => Promise<void>,
+	onNote: (file: TFile) => void,
 ): void {
 	const key = FOLDER_KEY[kind];
 	const base: PassageSource = {
 		passage,
 		source,
+		cite,
 		folder: folders[key],
-		onCreated: (folder) => {
+		onCreated: (folder, file) => {
 			folders[key] = folder;
 			void save();
+			onNote(file);
 		},
 	};
 	if (kind === "note") new NoteModal(app, base).open();

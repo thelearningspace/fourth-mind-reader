@@ -33,6 +33,8 @@ import {
 import {
 	parseEpub,
 	renderSpineRange,
+	printPageAt,
+	printPageBeforeSpine,
 	expandSelfClosingTags,
 	revokeImageUrls,
 	extractLinkPreview,
@@ -793,6 +795,8 @@ export class ReaderView extends ItemView {
 	private escScopePushed = false;
 	private activeHighlight: CursorRange | null = null;
 	private activeSelectionText: string | null = null;
+	/** The selection's DOM range, kept for the print-page lookup in citations. */
+	private activeSelectionRange: Range | null = null;
 	private activeSelectionRect: DOMRect | null = null;
 	/** Anchored cross-page selection. While `isExtending`, the start boundary is
 	 *  frozen in `extendAnchor` (a live DOM point — valid as long as the unit's
@@ -3667,6 +3671,7 @@ export class ReaderView extends ItemView {
 		this.clearHighlightOverlay();
 		this.activeHighlight = cursorRange;
 		this.activeSelectionText = sel.toString();
+		this.activeSelectionRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
 		this.activeSelectionRect = anchorRect;
 		this.renderHighlightOverlay(cursorRange);
 		this.glossSurface.hideInput();
@@ -3838,8 +3843,8 @@ export class ReaderView extends ItemView {
 	}
 
 	/** Note / Claim / Link buttons: hand the live selection to the dialog,
-	 *  citing the book, the chapter it sits in, and the page as the reader
-	 *  numbers it. */
+	 *  citing the book, the chapter it sits in, and the print edition's page
+	 *  (omitted when the EPUB doesn't record its pages). */
 	private openPassageNote(kind: PassageKind): void {
 		const highlight = this.activeHighlight;
 		const passage = this.activeSelectionText ?? "";
@@ -3849,13 +3854,44 @@ export class ReaderView extends ItemView {
 			? this.sections[this.sectionIndexBySpine[parseInt(spine[1], 10)] ?? 0]?.label ?? ""
 			: "";
 		const title = this.book?.title ?? this.currentFile.basename;
+		const bookLink = `[[${this.currentFile.path}|${title}]]`;
+		const page = this.printPage();
+		const companion = this.getCompanionDocPath() ?? "";
 		const source = [
-			`[[${this.currentFile.path}|${title}]]`,
+			bookLink,
 			chapter,
-			`p. ${this.getGlobalSpread() + 1}`,
+			page && `${page.includes("–") ? "pp." : "p."} ${page}`,
 		].filter(Boolean).join(" · ");
 		this.dismissGloss();
-		openPassageDialog(this.app, kind, passage, source, this.plugin.settings, () => this.plugin.saveSettings());
+		// Keep the passage highlighted in the book, its note pointing at the new file.
+		const keepHighlight = (note: TFile): void => {
+			const link = `[[${this.app.metadataCache.fileToLinktext(note, companion)}]]`;
+			this.persistGloss("emphasise", link, passage, highlight, false).catch((err) => {
+				console.error("persistGloss failed", err);
+				new Notice("Fourth Mind Reader: failed to save the highlight");
+			});
+		};
+		openPassageDialog(this.app, kind, passage, source, { source: bookLink, page },
+			this.plugin.settings, () => this.plugin.saveSettings(), keepHighlight);
+	}
+
+	/** "12" or "12–13" from the book's own page markers around the selection
+	 *  — stable across font size, theme and window width. Empty if none. */
+	private printPage(): string {
+		const range = this.activeSelectionRange;
+		if (!range || !this.book) return "";
+		const pageAt = (node: Node): string | null => {
+			const el = node instanceof Element ? node : node.parentElement;
+			const unit = el?.closest(".tmr-unit");
+			const local = unit ? printPageAt(unit, node) : null;
+			if (local) return local;
+			const spine = el?.closest<HTMLElement>(".tmr-spine-item")?.dataset.spineIndex;
+			return spine ? printPageBeforeSpine(this.book!, parseInt(spine, 10)) : null;
+		};
+		const start = pageAt(range.startContainer);
+		if (!start) return "";
+		const end = pageAt(range.endContainer);
+		return end && end !== start ? `${start}–${end}` : start;
 	}
 
 	/** Copy button: the selected text to the clipboard, then close the bar. */
@@ -3907,6 +3943,7 @@ export class ReaderView extends ItemView {
 		userText: string,
 		quote: string,
 		highlight: CursorRange,
+		announce = true,
 	): Promise<void> {
 		const path = this.getCompanionDocPath();
 		if (!path) return;
@@ -3941,7 +3978,7 @@ export class ReaderView extends ItemView {
 		});
 		this.renderSavedHighlights();
 		if (isAiMode) void this.pane.syncAiPendingFlag();
-		new Notice(`${modeLabel(modeId)} saved`);
+		if (announce) new Notice(`${modeLabel(modeId)} saved`);
 		// The initial AI call for AI-bearing modes is fired by `onGlossSubmit`
 		// once the Conversations card is open, so the first turn streams into the
 		// live log just like every follow-up turn.
@@ -4486,6 +4523,7 @@ export class ReaderView extends ItemView {
 		this.glossSurface.hide();
 		this.editingNoteIdx = null;
 		this.activeSelectionText = null;
+		this.activeSelectionRange = null;
 		this.activeSelectionRect = null;
 		// Tear down any armed extend (Escape-cancel, outside-click, or a unit
 		// boundary all route here).

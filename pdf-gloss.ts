@@ -943,7 +943,13 @@ export class PdfGlossController extends Component {
 		}
 		const passage = pending.text;
 		this.dismiss();
-		openPassageDialog(this.app, kind, passage, source, this.settings(), this.saveSettings);
+		const cite = { source: `[[${file.path}|${file.basename}]]`, page: String(pending.page) };
+		// Keep the passage highlighted in the PDF, its note pointing at the new file.
+		const keepHighlight = (note: TFile): void => {
+			const link = `[[${this.app.metadataCache.fileToLinktext(note, this.companionPath() ?? "")}]]`;
+			void this.persist("emphasise", link, pending, false);
+		};
+		openPassageDialog(this.app, kind, passage, source, cite, this.settings(), this.saveSettings, keepHighlight);
 	}
 
 	/** Copy button: the selected text to the clipboard, then close the bar. */
@@ -957,13 +963,14 @@ export class PdfGlossController extends Component {
 		);
 	}
 
-	private async persist(modeId: string, userText: string): Promise<void> {
+	/** `pending` defaults to the live selection; the passage dialogs pass the
+	 *  one they were opened on, long since dismissed. */
+	private async persist(modeId: string, userText: string, pending = this.pending, announce = true): Promise<void> {
 		if (this.editingNoteIdx !== null) {
 			await this.pane?.commitNoteEdit(this.editingNoteIdx, userText);
 			this.dismiss();
 			return;
 		}
-		const pending = this.pending;
 		const file = this.child.file;
 		const path = this.companionPath();
 		if (!pending || !file || !path) {
@@ -1002,7 +1009,7 @@ export class PdfGlossController extends Component {
 				userText,
 				sourceLink,
 			}));
-			new Notice(`${modeLabel(modeId)} saved`);
+			if (announce) new Notice(`${modeLabel(modeId)} saved`);
 			// Paint it now rather than waiting on the vault `modify` event, which
 			// is debounced and would leave the new highlight invisible for a beat.
 			await this.reloadHighlights();

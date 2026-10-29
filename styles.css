@@ -6951,7 +6951,8 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-action { height: 40px; font-size: 14px;
 }
 .tmr-claim-modal textarea.tmr-claim-text,
 .tmr-claim-modal input.tmr-claim-title,
-.tmr-claim-modal input.tmr-claim-folder { width: 100%; }
+.tmr-claim-modal input.tmr-claim-folder,
+.tmr-claim-modal input.tmr-claim-tags { width: 100%; }
 .tmr-claim-modal textarea.tmr-claim-text { resize: vertical; min-height: 4.5em; }
 .tmr-claim-modal textarea.tmr-note-text { min-height: 8em; }
 .tmr-claim-passage {
