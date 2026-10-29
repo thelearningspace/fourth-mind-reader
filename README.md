@@ -2,7 +2,7 @@
 
 ![image-20261029142634860](assets/image-20261029142634860.png)
 
-
+There are sections that help to sort the books. 
 
 ![image-20261029142805520](assets/image-20261029142805520.png)
 
