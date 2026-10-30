@@ -1647,6 +1647,31 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-tile:hover {
 	right: 0.75rem;
 }
 
+/* Too narrow a gutter for the counters (see syncFooterCounterLayout): lift
+   them into a row just above the bar, flush with its ends. The Back pill and
+   scrub tooltip are opaque and paint over them; the counters also step aside
+   while the pointer is on the bar, so the tooltip has the row to itself. */
+.tmr-footer.tmr-footer-stacked .tmr-page-info,
+.tmr-footer.tmr-footer-stacked .tmr-global-page {
+	top: auto;
+	bottom: calc(50% + 5px);
+	transform: none;
+	line-height: 1;
+}
+
+.tmr-footer.tmr-footer-stacked .tmr-page-info {
+	left: var(--tmr-side-pad);
+}
+
+.tmr-footer.tmr-footer-stacked .tmr-global-page {
+	right: var(--tmr-side-pad);
+}
+
+.tmr-root .tmr-footer.tmr-footer-stacked:has(.tmr-progress-bar:hover) .tmr-page-info,
+.tmr-root .tmr-footer.tmr-footer-stacked:has(.tmr-progress-bar:hover) .tmr-global-page {
+	opacity: 0;
+}
+
 /* `.tmr-chrome-visible` is the touch stand-in for pointer hover — see the
    reader chrome note by the .tmr-toc-toggle reveal below. */
 .tmr-root.tmr-chrome-visible .tmr-global-page,

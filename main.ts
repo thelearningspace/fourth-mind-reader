@@ -816,6 +816,9 @@ export class ReaderView extends ItemView {
 	private positionSaveTimer: number | null = null;
 
 	private static readonly GAP = 48;
+	/** Room a footer counter needs beyond its own width to sit beside the bar:
+	 *  its 0.75rem inset from the pane edge plus an 8px gap before the segments. */
+	private static readonly FOOTER_COUNTER_CLEARANCE = 20;
 	private static readonly SINGLE_PAGE_HYSTERESIS = 32;
 	/** Mobile width changes only in one discrete jump, on rotation, so desktop's
 	 *  anti-flap band becomes a liability: an iPad Air landscape (candidate 1045)
@@ -4672,6 +4675,7 @@ export class ReaderView extends ItemView {
 			this.localPageEl.setText(`${localPage} / ${sectionCount}`);
 			this.localPageEl.toggleClass("tmr-page-info-max", localPage === sectionCount);
 		}
+		this.syncFooterCounterLayout();
 		// The phone toolbar's resting label (Mobile/Default). Rides updateProgress
 		// because that already runs on every navigation, and the section index it
 		// just resolved is exactly what the label needs.
@@ -4711,6 +4715,24 @@ export class ReaderView extends ItemView {
 			}
 		});
 		this.updateBackMarker();
+	}
+
+	/** Lift the page counters into a row above the bar when the footer's side
+	 *  gutters are too narrow to hold them beside it — a narrow pane, or a small
+	 *  margin setting. Measured rather than tied to a breakpoint, because the
+	 *  gutter depends on pane width, layout mode and margin scale at once. Runs
+	 *  from updateProgress, which every resize and page turn already reaches,
+	 *  so a counter that grows a digit re-checks too. */
+	private syncFooterCounterLayout(): void {
+		const footer = this.localPageEl?.parentElement;
+		if (!footer || !this.localPageEl || !this.globalPageEl) return;
+		const gutter = parseFloat(getComputedStyle(footer).paddingLeft);
+		const widest = Math.max(this.localPageEl.offsetWidth, this.globalPageEl.offsetWidth);
+		// Hidden counters (phones) measure 0 and never stack.
+		footer.toggleClass(
+			"tmr-footer-stacked",
+			widest > 0 && Number.isFinite(gutter) && widest + ReaderView.FOOTER_COUNTER_CLEARANCE > gutter,
+		);
 	}
 
 	private onProgressMouseDown(e: MouseEvent): void {
