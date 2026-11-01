@@ -1,7 +1,8 @@
 /** Dialogs that turn a selected passage into its own vault note — a quick
  *  Note (a fleeting thought, filed in Fleeting Notes by default), a Claim
- *  ("Make it a claim"), or a Link to an idea already in the vault. The reader's own words go first, then the passage they
- *  rest on and a link back to where it came from. Shared by the EPUB and PDF
+ *  ("Make it a claim"), or a Link to an idea already in the vault. Notes and
+ *  claims read: title, the quoted passage, the reader's own words, then a link
+ *  back to where it came from; links put the reader's words first. Shared by the EPUB and PDF
  *  hosts, which differ only in how they describe the source.
  */
 
@@ -152,10 +153,21 @@ abstract class PassageNoteModal extends Modal {
 		return lines.join("\n");
 	}
 
-	/** Passage, Source, Folder and the Cancel / confirm buttons. */
-	protected renderTail(confirmLabel: string, onConfirm: () => void): void {
+	protected renderPassage(): void {
 		this.field("Passage").createDiv({ cls: "tmr-claim-passage", text: this.passage });
+	}
+
+	protected renderSource(): void {
 		this.field("Source").createDiv({ cls: "tmr-claim-source", text: this.src.source });
+	}
+
+	/** Passage, Source (unless the subclass already placed them), Folder and
+	 *  the Cancel / confirm buttons. */
+	protected renderTail(confirmLabel: string, onConfirm: () => void, placedAbove = false): void {
+		if (!placedAbove) {
+			this.renderPassage();
+			this.renderSource();
+		}
 		const folderEl = this.field("Folder").createEl("input", {
 			cls: "tmr-claim-folder",
 			attr: { type: "text", placeholder: "The vault's root" },
@@ -172,13 +184,15 @@ abstract class PassageNoteModal extends Modal {
 
 	/** Write `folder/title.md` holding `text`, the passage as a quote, the
 	 *  source line and any `lines` after it, under the citation properties when
-	 *  `withProperties`. Null if nothing was written. */
+	 *  `withProperties`. With `titleFirst` the note instead reads: title as a
+	 *  heading, quoted passage, `text`, source. Null if nothing was written. */
 	protected async save(
 		text: string,
 		rawTitle: string,
 		kind: string,
 		lines: string[] = [],
 		withProperties = false,
+		titleFirst = false,
 	): Promise<TFile | null> {
 		const title = sanitizeFileName(rawTitle.replace(/…$/, "")).replace(/^\.+/, "") || kind;
 		const folder = (this.folderEl?.value ?? "").trim().replace(/^\/+|\/+$/g, "");
@@ -189,7 +203,11 @@ abstract class PassageNoteModal extends Modal {
 		const path = this.freePath(folder, title);
 		const quote = this.src.passage.trim().split(/\r?\n/).map((l) => `> ${l}`).join("\n");
 		const tail = [`Source: ${this.src.source}`, ...lines, this.src.extra ?? ""].filter(Boolean);
-		const body = `${withProperties ? this.frontmatter() : ""}${text}\n\n${quote}\n\n${tail.join("\n")}\n`;
+		const props = withProperties ? this.frontmatter() : "";
+		const heading = rawTitle.replace(/…$/, "").trim() || kind;
+		const body = titleFirst
+			? `${props}# ${heading}\n\n${quote}\n\n${text}\n\n${tail.join("\n")}\n`
+			: `${props}${text}\n\n${quote}\n\n${tail.join("\n")}\n`;
 		let file: TFile;
 		try {
 			file = await this.app.vault.create(path, body);
@@ -222,11 +240,13 @@ export class NoteModal extends PassageNoteModal {
 		this.modalEl.addClass("tmr-claim-modal");
 		this.setTitle("Note");
 
-		const noteEl = this.field("Your note").createEl("textarea", { cls: "tmr-claim-text tmr-note-text" });
 		const titleEl = this.field("Title").createEl("input", {
 			cls: "tmr-claim-title",
 			attr: { type: "text", placeholder: "First line of the note" },
 		});
+		this.renderPassage();
+		const noteEl = this.field("Your note").createEl("textarea", { cls: "tmr-claim-text tmr-note-text" });
+		this.renderSource();
 		this.renderTags();
 		this.renderTail("Save", () => {
 			const text = noteEl.value.trim();
@@ -235,8 +255,8 @@ export class NoteModal extends PassageNoteModal {
 				return;
 			}
 			const title = titleEl.value.trim() || clip(text.split(/\r?\n/, 1)[0], TITLE_MAX);
-			void this.save(text, title, "Note", [], true);
-		});
+			void this.save(text, title, "Note", [], true, true);
+		}, true);
 		noteEl.focus();
 	}
 }
@@ -247,11 +267,13 @@ export class ClaimModal extends PassageNoteModal {
 		this.modalEl.addClass("tmr-claim-modal");
 		this.setTitle("Make it a claim");
 
+		const titleEl = this.field("Title").createEl("input", { cls: "tmr-claim-title", attr: { type: "text" } });
+		titleEl.value = clip(this.passage, TITLE_MAX);
+		this.renderPassage();
 		const claimEl = this.field("The claim").createEl("textarea", { cls: "tmr-claim-text" });
 		claimEl.value = this.passage;
 		claimEl.rows = 3;
-		const titleEl = this.field("Title").createEl("input", { cls: "tmr-claim-title", attr: { type: "text" } });
-		titleEl.value = clip(this.passage, TITLE_MAX);
+		this.renderSource();
 		this.renderTags("claim ");
 		this.renderTail("Create", () => {
 			const claim = claimEl.value.trim();
@@ -259,8 +281,8 @@ export class ClaimModal extends PassageNoteModal {
 				new Notice("Write the claim first");
 				return;
 			}
-			void this.save(claim, titleEl.value, "Claim", [], true);
-		});
+			void this.save(claim, titleEl.value, "Claim", [], true, true);
+		}, true);
 		claimEl.focus();
 		claimEl.select();
 	}

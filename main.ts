@@ -114,6 +114,40 @@ const SEARCH_MIN_CHARS = 2;
 const SEARCH_MAX_HITS = 500;
 const SEARCH_RENDER_CAP = 100;
 
+// Estimated page for EPUBs without print page markers: a typical hardcover
+// page. Spine word counts are read once per book and cached.
+const WORDS_PER_PAGE = 300;
+const spineWordCache = new WeakMap<EpubBook, Promise<number[]>>();
+
+function countWords(text: string): number {
+	return text.match(/\S+/g)?.length ?? 0;
+}
+
+function spineWordCounts(book: EpubBook): Promise<number[]> {
+	let counts = spineWordCache.get(book);
+	if (!counts) {
+		counts = (async () => {
+			const parser = new DOMParser();
+			const out: number[] = [];
+			for (const item of book.spine) {
+				let n = 0;
+				try {
+					const raw = await book.zip.file(book.opfDir + item.href)!.async("string");
+					const body = parser.parseFromString(expandSelfClosingTags(raw), "text/html").querySelector("body");
+					if (body) {
+						body.querySelectorAll("style, script").forEach((el) => el.remove());
+						n = countWords(body.textContent ?? "");
+					}
+				} catch { /* unreadable item counts as empty */ }
+				out.push(n);
+			}
+			return out;
+		})();
+		spineWordCache.set(book, counts);
+	}
+	return counts;
+}
+
 interface ImportEntry {
 	/** Book root as it appears in `webkitRelativePath`, e.g. `Books/Zen.epub`. */
 	root: string;
@@ -880,10 +914,10 @@ export class ReaderView extends ItemView {
 			settings: () => this.plugin.settings,
 			sourcePath: () => this.getCompanionDocPath() ?? "",
 			onExtend: () => this.beginExtend(),
-			onClaim: () => this.openPassageNote("claim"),
-			onNote: () => this.openPassageNote("note"),
+			onClaim: () => void this.openPassageNote("claim"),
+			onNote: () => void this.openPassageNote("note"),
 			onCopy: () => this.copySelection(),
-			onLink: () => this.openPassageNote("link"),
+			onLink: () => void this.openPassageNote("link"),
 			onSubmit: (mode, text) => this.onGlossSubmit(mode, text),
 			onDismiss: () => this.dismissGloss(),
 			onInputOpen: () => this.syncScrim(),
@@ -3847,8 +3881,8 @@ export class ReaderView extends ItemView {
 
 	/** Note / Claim / Link buttons: hand the live selection to the dialog,
 	 *  citing the book, the chapter it sits in, and the print edition's page
-	 *  (omitted when the EPUB doesn't record its pages). */
-	private openPassageNote(kind: PassageKind): void {
+	 *  (estimated, marked ≈, when the EPUB doesn't record its pages). */
+	private async openPassageNote(kind: PassageKind): Promise<void> {
 		const highlight = this.activeHighlight;
 		const passage = this.activeSelectionText ?? "";
 		if (!highlight || !passage.trim() || !this.currentFile) return;
@@ -3858,12 +3892,16 @@ export class ReaderView extends ItemView {
 			: "";
 		const title = this.book?.title ?? this.currentFile.basename;
 		const bookLink = `[[${this.currentFile.path}|${title}]]`;
-		const page = this.printPage();
+		const printed = this.printPage();
+		// No print page markers: fall back to an estimate, flagged with ≈.
+		const estimated = printed ? "" : await this.estimatePage();
+		const page = printed || (estimated && `≈${estimated}`);
 		const companion = this.getCompanionDocPath() ?? "";
 		const source = [
 			bookLink,
 			chapter,
-			page && `${page.includes("–") ? "pp." : "p."} ${page}`,
+			printed && `${printed.includes("–") ? "pp." : "p."} ${printed}`,
+			estimated && `≈ p. ${estimated}`,
 		].filter(Boolean).join(" · ");
 		this.dismissGloss();
 		// Keep the passage highlighted in the book, its note pointing at the new file.
@@ -3895,6 +3933,35 @@ export class ReaderView extends ItemView {
 		if (!start) return "";
 		const end = pageAt(range.endContainer);
 		return end && end !== start ? `${start}–${end}` : start;
+	}
+
+	/** Estimated print page for EPUBs without page markers: words from the
+	 *  start of the book to the selection, at WORDS_PER_PAGE. Empty if the
+	 *  selection can't be placed. */
+	private async estimatePage(): Promise<string> {
+		const range = this.activeSelectionRange;
+		const book = this.book;
+		if (!range || !book) return "";
+		const start = range.startContainer;
+		const el = start instanceof Element ? start : start.parentElement;
+		const item = el?.closest<HTMLElement>(".tmr-spine-item");
+		const index = parseInt(item?.dataset.spineIndex ?? "", 10);
+		if (!item || !Number.isFinite(index)) return "";
+		let words = 0;
+		try {
+			const before = document.createRange();
+			before.setStart(item, 0);
+			before.setEnd(start, range.startOffset);
+			words = countWords(before.toString());
+		} catch { /* selection outside the spine item: count from its start */ }
+		let counts: number[];
+		try {
+			counts = await spineWordCounts(book);
+		} catch {
+			return "";
+		}
+		for (let i = 0; i < index && i < counts.length; i++) words += counts[i];
+		return String(Math.floor(words / WORDS_PER_PAGE) + 1);
 	}
 
 	/** Copy button: the selected text to the clipboard, then close the bar. */
