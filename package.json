@@ -8,7 +8,8 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "build:mobile": "npm run build && node scripts/stage-mobile.mjs",
     "lint": "eslint . --quiet",
-    "install-vault": "npm run build && node scripts/install-to-vault.mjs"
+    "install-vault": "npm run build && node scripts/install-to-vault.mjs",
+    "release": "node scripts/release.mjs"
   },
   "keywords": [],
   "author": "Rohan Bell",
