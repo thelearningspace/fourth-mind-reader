@@ -32,6 +32,8 @@ export interface EpubBook {
 	title: string;
 	/** First dc:creator, or "" when the package names none. */
 	author: string;
+	/** First dc:language (a BCP 47 tag like "en-GB"), or "" when absent. */
+	language: string;
 	spine: EpubManifestItem[];
 	manifest: Record<string, EpubManifestItem>;
 	toc: EpubTocItem[];
@@ -172,7 +174,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 
 	// 2. OPF → spine + manifest + title
 	const opfXml = await fs.readString(opfPath);
-	const { title, author, spine, manifest } = parseOpf(opfXml, opfDir);
+	const { title, author, language, spine, manifest } = parseOpf(opfXml, opfDir);
 
 	// 3. nav.xhtml → ToC (fall back to toc.ncx)
 	const navItem = Object.values(manifest).find(i => i.properties === "nav");
@@ -234,7 +236,7 @@ async function parseWithFS(fs: EpubFS): Promise<Omit<EpubBook, "zip">> {
 	// 6. Pre-scan spine items for bibliography-style citations (e.g. "[78] Author...")
 	const citations = await parseCitationsFromSpine(fs, opfDir, spine);
 
-	return { title, author, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations, pageList };
+	return { title, author, language, spine, manifest, toc, imageMap, blobUrls, opfDir, cssCache, citations, pageList };
 }
 
 /** Walk every spine item looking for paragraphs whose text begins with "[N] ".
@@ -1075,6 +1077,7 @@ function parseContainerXml(xml: string): string {
 function parseOpf(xml: string, _opfDir: string): {
 	title: string;
 	author: string;
+	language: string;
 	spine: EpubManifestItem[];
 	manifest: Record<string, EpubManifestItem>;
 } {
@@ -1086,6 +1089,7 @@ function parseOpf(xml: string, _opfDir: string): {
 	const title = doc.querySelector("metadata > title, metadata *|title")?.textContent?.trim() ?? "Untitled";
 	// First dc:creator only; multi-author handling deferred.
 	const author = doc.querySelector("metadata > creator, metadata *|creator")?.textContent?.trim() ?? "";
+	const language = doc.querySelector("metadata > language, metadata *|language")?.textContent?.trim() ?? "";
 
 	const manifest: Record<string, EpubManifestItem> = {};
 	doc.querySelectorAll("manifest > item").forEach((el) => {
@@ -1104,7 +1108,7 @@ function parseOpf(xml: string, _opfDir: string): {
 		if (manifest[idref]) spine.push(manifest[idref]);
 	});
 
-	return { title, author, spine, manifest };
+	return { title, author, language, spine, manifest };
 }
 
 function parseNav(xml: string): EpubTocItem[] {

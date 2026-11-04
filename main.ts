@@ -244,6 +244,12 @@ interface ThirdMindReaderSettings {
 	/** How the neighbouring pages that bleed into the side margins are drawn.
 	 *  Desktop only: touch layouts always clip them. */
 	readerAdjacentPages: "default" | "muted" | "hidden";
+	/** Justify body paragraphs. Paragraphs the book itself centres or
+	 *  right-aligns keep their alignment. */
+	readerJustify: boolean;
+	/** Hyphenate body text, using the book's dc:language. Only offered while
+	 *  justifying, where it closes the gaps a narrow column would open. */
+	readerHyphenate: boolean;
 }
 
 /** `family: null` is the reader's own default: Labrada in 3C mode, Obsidian's
@@ -284,6 +290,13 @@ function appearanceVars(settings: ThirdMindReaderSettings): Record<string, strin
 	};
 }
 
+/** Classes rather than variables: justification must skip paragraphs the book
+ *  aligned itself, which needs selectors, not a value. */
+function applyTextAlignClasses(el: HTMLElement, settings: ThirdMindReaderSettings): void {
+	el.toggleClass("tmr-justify", settings.readerJustify);
+	el.toggleClass("tmr-hyphenate", settings.readerJustify && settings.readerHyphenate);
+}
+
 function applyCssVars(el: HTMLElement, vars: Record<string, string | null>): void {
 	for (const [name, value] of Object.entries(vars)) {
 		if (value === null) el.style.removeProperty(name);
@@ -322,6 +335,8 @@ const DEFAULT_SETTINGS: ThirdMindReaderSettings = {
 	readerLineWidth: null,
 	readerMargins: null,
 	readerAdjacentPages: "default",
+	readerJustify: false,
+	readerHyphenate: true,
 };
 
 /** Bounds of the reader text-size override. Wider than Obsidian's own slider at
@@ -1306,6 +1321,7 @@ export class ReaderView extends ItemView {
 		const adjacent = this.plugin.settings.readerAdjacentPages;
 		this.contentEl.toggleClass("tmr-adjacent-muted", adjacent === "muted");
 		this.contentEl.toggleClass("tmr-adjacent-hidden", adjacent === "hidden");
+		applyTextAlignClasses(this.contentEl, this.plugin.settings);
 		const signature = this.appearanceSignature();
 		if (signature === this.appliedAppearance) return;
 		const first = this.appliedAppearance === "";
@@ -1327,6 +1343,8 @@ export class ReaderView extends ItemView {
 			s.readerParagraphSpacing,
 			s.readerLineWidth,
 			s.readerMargins,
+			// Justifying alone keeps line breaks, but hyphenation moves them.
+			s.readerJustify && s.readerHyphenate,
 		].join("|");
 	}
 
@@ -2268,6 +2286,7 @@ export class ReaderView extends ItemView {
 		try {
 			if (this.book) revokeImageUrls(this.book);
 			this.book = await parse();
+			this.applyBookLanguage();
 			// Remove loading element before measuring so the spread gets full
 			// flex height — otherwise .tmr-loading (also flex:1) steals half
 			// the vertical space, inflating measured spread counts.
@@ -2443,6 +2462,20 @@ export class ReaderView extends ItemView {
 		const content = spread.createDiv({ cls: "tmr-content" });
 		this.measurementSpreadEl = spread;
 		this.measurementContentEl = content;
+		this.applyBookLanguage();
+	}
+
+	/** `hyphens: auto` picks its dictionary from `lang`, so the book's own
+	 *  language goes on every spread, the hidden measuring one included, or
+	 *  pagination would hyphenate differently from what's shown. No language in
+	 *  the package → inherit the app's. */
+	private applyBookLanguage(): void {
+		const lang = this.book?.language ?? "";
+		for (const spread of [this.spreadEl, this.measurementSpreadEl]) {
+			if (!spread) continue;
+			if (lang) spread.setAttr("lang", lang);
+			else spread.removeAttribute("lang");
+		}
 	}
 
 	private applyPagination(
@@ -6182,6 +6215,17 @@ class TmrSettingTab extends PluginSettingTab {
 							format: (n) => n.toFixed(1),
 							sampleVar: ["--tmr-para-spacing", "em"],
 						}),
+						{
+							name: "Justify text",
+							desc: "Align paragraphs to both edges of the column. Paragraphs the book centres or right-aligns keep their alignment.",
+							control: { type: "toggle", key: "readerJustify" },
+						},
+						{
+							name: "Hyphenation",
+							desc: "Break long words at line ends so justified lines don't open wide gaps. Uses the book's language; falls back to Obsidian's.",
+							visible: () => this.plugin.settings.readerJustify,
+							control: { type: "toggle", key: "readerHyphenate" },
+						},
 					],
 				},
 				{
@@ -6323,6 +6367,7 @@ class TmrSettingTab extends PluginSettingTab {
 			? READER_FONTS.labrada.family
 			: READER_FONTS.obsidian.family;
 		applyCssVars(this.sampleEl, vars);
+		applyTextAlignClasses(this.sampleEl, settings);
 	}
 
 	private async resetAppearance(): Promise<void> {
@@ -6334,6 +6379,8 @@ class TmrSettingTab extends PluginSettingTab {
 		settings.readerLineWidth = DEFAULT_SETTINGS.readerLineWidth;
 		settings.readerMargins = DEFAULT_SETTINGS.readerMargins;
 		settings.readerAdjacentPages = DEFAULT_SETTINGS.readerAdjacentPages;
+		settings.readerJustify = DEFAULT_SETTINGS.readerJustify;
+		settings.readerHyphenate = DEFAULT_SETTINGS.readerHyphenate;
 		await this.plugin.saveSettings();
 		this.update();
 	}
@@ -6404,6 +6451,8 @@ class TmrSettingTab extends PluginSettingTab {
 			case "aiFeaturesEnabled":
 			case "streaming":
 			case "deferAiToDesktop":
+			case "readerJustify":
+			case "readerHyphenate":
 				return settings[key];
 			default: return undefined;
 		}
@@ -6434,6 +6483,8 @@ class TmrSettingTab extends PluginSettingTab {
 			case "aiFeaturesEnabled":
 			case "streaming":
 			case "deferAiToDesktop":
+			case "readerJustify":
+			case "readerHyphenate":
 				settings[key] = value === true;
 				break;
 			default: return;
@@ -6442,7 +6493,7 @@ class TmrSettingTab extends PluginSettingTab {
 		// every open reader, Library and PDF view.
 		await this.plugin.saveSettings();
 		this.styleSample();
-		if (key === "followAppTextSize") this.update();
+		if (key === "followAppTextSize" || key === "readerJustify") this.update();
 	}
 
 	private renderFooterButtons(setting: Setting): void {

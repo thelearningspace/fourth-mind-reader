@@ -714,6 +714,32 @@ body.is-mobile .tmr-root.tmr-kbd-frozen .tmr-spread {
 	color: var(--foreground);
 }
 
+/* Appearance → Justify text. Set on the container and inherited, not aimed at
+   <p>: many converted books (Calibre especially) build paragraphs from <div>s.
+   The book's own alignment arrives as inline styles (applyLayoutStyles in
+   epub.ts) and wins over inheritance, so centred and right-aligned blocks —
+   and everything inside them — keep it. Only an explicit left/start is
+   overridden, which needs !important to beat the inline style. */
+.tmr-justify .tmr-content,
+.tmr-justify .tmr-content [style*="text-align: left"],
+.tmr-justify .tmr-content [style*="text-align: start"],
+.tmr-justify.tmr-settings-sample p {
+	text-align: justify !important;
+}
+
+/* `hyphens` inherits too. Headings opt back out: a broken word in a title
+   reads as a mistake. */
+.tmr-hyphenate .tmr-content,
+.tmr-hyphenate.tmr-settings-sample p {
+	-webkit-hyphens: auto;
+	hyphens: auto;
+}
+
+.tmr-hyphenate .tmr-content :is(h1, h2, h3, h4, h5, h6) {
+	-webkit-hyphens: manual;
+	hyphens: manual;
+}
+
 /* Obsidian's global rule sets margin-block: var(--p-spacing) on all h1-h6.
    Themes like Minimal set --p-spacing to large values (1.75rem), injecting
    unwanted space into our reader. Reset to 0 so we own all heading spacing. */
