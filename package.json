@@ -1,6 +1,6 @@
 {
   "name": "fourth-mind-reader",
-  "version": "1.0.2-fmr.2",
+  "version": "1.0.2-fmr.3",
   "description": "Third Mind Reader \u2014 Obsidian Plugin",
   "main": "main.js",
   "scripts": {
