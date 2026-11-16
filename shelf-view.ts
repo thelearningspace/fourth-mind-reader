@@ -26,6 +26,7 @@ import { EditBookDetailsModal, FolderNameModal } from "./library-modals";
 import { cachedCover, loadCover } from "./shelf-covers";
 import { formatReadingTime } from "./reading-time";
 import { figure, hours } from "./book-stats";
+import { renderReadingGoalCard } from "./reading-goal";
 
 /**
  * The Library, laid out as a shelf: what you are reading up top, then the
@@ -73,7 +74,6 @@ const MODE_LABELS: Record<string, string> = {
  *  is often notes and index, which nobody pages through. */
 const FINISHED_AT = 0.98;
 const HERO_COUNT = 2;
-const RECENT_COUNT = 12;
 const HIGHLIGHTS_SHOWN = 30;
 const TINTS = 8;
 
@@ -215,6 +215,8 @@ export class LibraryView extends ItemView {
 	/** The Library follows Obsidian's theme; this only keeps the 3C button in step
 	 *  with the reader's mode. */
 	applyThemeClasses(): void {
+		// The reading goal lives in settings too; repaint so a new goal shows.
+		this.paintBody();
 		this.headEl
 			?.querySelector(".fmr-shelf-3c")
 			?.toggleClass("is-active", this.plugin.settings.tmrMode === "3c");
@@ -439,11 +441,6 @@ export class LibraryView extends ItemView {
 				const hero = body.createDiv({ cls: "fmr-shelf-hero" });
 				for (const book of current) this.renderHero(hero, book);
 			}
-			if (this.books.length > RECENT_COUNT / 2) {
-				body.createDiv({ cls: "fmr-shelf-section", text: "Recently added" });
-				const row = body.createDiv({ cls: "fmr-shelf-grid fmr-shelf-grid--recent" });
-				for (const book of this.sorted(this.books, "added").slice(0, RECENT_COUNT)) this.renderCard(row, book);
-			}
 		}
 
 		const visible = this.sorted(this.visibleBooks(), this.sort);
@@ -470,6 +467,18 @@ export class LibraryView extends ItemView {
 		const finished = this.books.filter((b) => statusOf(b) === "finished").length;
 		const share = finished / this.books.length;
 		const totalMs = this.books.reduce((sum, b) => sum + b.readingMs, 0);
+
+		parent.createDiv({ cls: "fmr-shelf-section", text: "Reading goal" });
+		const settings = this.plugin.settings;
+		renderReadingGoalCard(parent, {
+			positions: settings.bookPositions,
+			goalMinutes: settings.readingGoalMinutes,
+			calendarOpen: settings.readingCalendarOpen,
+			onToggleCalendar: (open) => {
+				settings.readingCalendarOpen = open;
+				void this.plugin.persistSettings();
+			},
+		});
 
 		parent.createDiv({ cls: "fmr-shelf-section", text: "All books" });
 		const strip = parent.createDiv({ cls: "fmr-stats-summary" });

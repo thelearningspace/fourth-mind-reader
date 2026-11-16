@@ -51,6 +51,7 @@ import { OffsetMap, type CursorRange, isRegisterableBlock, REGISTERABLE_BLOCK_SE
 import { isLocalEndpoint, probeProvider, starterModel, type AiProvider, type ProviderKind, type LocalRuntime } from "./ai-client";
 import { findFlaggedDocs, processPendingInFile } from "./ai-queue";
 import { LibraryView, LIBRARY_VIEW_TYPE } from "./shelf-view";
+import { READING_GOAL_DEFAULT, READING_GOAL_MAX, READING_GOAL_MIN } from "./reading-goal";
 import { clearCovers } from "./shelf-covers";
 import { type LibraryOverride, invalidateMetaCache, configureLibraryPaths, libraryRootPath, annotationsFolderPath, DEFAULT_LIBRARY_ROOT, companionDocPath, sanitizeFileName } from "./library-scan";
 // Shared Gloss grammar — the annotation surface, saved-highlight model, and
@@ -250,6 +251,10 @@ interface ThirdMindReaderSettings {
 	/** Hyphenate body text, using the book's dc:language. Only offered while
 	 *  justifying, where it closes the gaps a narrow column would open. */
 	readerHyphenate: boolean;
+	/** Minutes of reading a day that count toward the Library's streak. */
+	readingGoalMinutes: number;
+	/** Whether the Library's reading calendar is expanded. */
+	readingCalendarOpen: boolean;
 }
 
 /** `family: null` is the reader's own default: Labrada in 3C mode, Obsidian's
@@ -337,6 +342,8 @@ const DEFAULT_SETTINGS: ThirdMindReaderSettings = {
 	readerAdjacentPages: "default",
 	readerJustify: false,
 	readerHyphenate: true,
+	readingGoalMinutes: READING_GOAL_DEFAULT,
+	readingCalendarOpen: true,
 };
 
 /** Bounds of the reader text-size override. Wider than Obsidian's own slider at
@@ -6425,6 +6432,17 @@ class TmrSettingTab extends PluginSettingTab {
 						visible: () => !this.plugin.settings.aiFeaturesEnabled,
 						control: { type: "toggle", key: "quickHighlight" },
 					},
+					{
+						name: "Daily reading goal",
+						desc: "Minutes of reading a day that keep your streak going. Progress and the year's calendar are shown at the top of the Library.",
+						control: {
+							type: "slider",
+							key: "readingGoalMinutes",
+							min: READING_GOAL_MIN,
+							max: READING_GOAL_MAX,
+							step: 5,
+						},
+					},
 				],
 			},
 			{
@@ -6446,6 +6464,7 @@ class TmrSettingTab extends PluginSettingTab {
 			case "followAppTextSize": return settings.readerFontSize === null;
 			case "readerFont": return settings.readerFont;
 			case "readerAdjacentPages": return settings.readerAdjacentPages;
+			case "readingGoalMinutes": return settings.readingGoalMinutes;
 			case "quickHighlight": return settings.quickHighlight[Platform.isMobile ? "mobile" : "desktop"];
 			case "primaryProviderId": return settings.aiDefaults.primaryProviderId ?? "";
 			case "aiFeaturesEnabled":
@@ -6473,6 +6492,11 @@ class TmrSettingTab extends PluginSettingTab {
 				break;
 			case "readerAdjacentPages":
 				settings.readerAdjacentPages = value === "muted" || value === "hidden" ? value : "default";
+				break;
+			case "readingGoalMinutes":
+				settings.readingGoalMinutes = typeof value === "number"
+					? Math.min(READING_GOAL_MAX, Math.max(READING_GOAL_MIN, Math.round(value)))
+					: READING_GOAL_DEFAULT;
 				break;
 			case "quickHighlight":
 				settings.quickHighlight[Platform.isMobile ? "mobile" : "desktop"] = value === true;

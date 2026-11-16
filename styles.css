@@ -6418,15 +6418,6 @@ body.is-mobile .tmr-root.tmr-library {
 	grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
 	gap: var(--size-4-6) var(--size-4-4);
 }
-/* Recently added shows a single row: extra cards wrap into zero-height rows. */
-.fmr-shelf-grid--recent {
-	grid-template-rows: auto;
-	grid-auto-rows: 0;
-	row-gap: 0;
-	overflow: hidden;
-	margin: calc(-1 * var(--size-4-2)) calc(-1 * var(--size-4-2)) 0;
-	padding: var(--size-4-2) var(--size-4-2) 0;
-}
 @container (max-width: 26rem) {
 	.fmr-shelf {
 		padding: var(--size-4-4) var(--size-4-3) var(--size-4-12);
@@ -7019,3 +7010,229 @@ body.is-mobile .tmr-gloss-bar .tmr-gloss-action { height: 40px; font-size: 14px;
 .tmr-claim-modal select.tmr-link-relationship { width: 100%; }
 .tmr-claim-modal .tmr-link-reverse { padding: 8px 0 0; border-top: none; }
 .tmr-claim-modal .tmr-link-reverse .setting-item-description { word-break: break-word; }
+
+/* ─── Library: reading goal and streak ─────────────────────────────────────── */
+.fmr-goal {
+	--fmr-goal-hue: var(--color-orange-rgb);
+	--fmr-goal-cell: 0.85rem;
+	--fmr-goal-gap: 3px;
+	padding: var(--size-4-5);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-l);
+	background: var(--background-primary);
+}
+.fmr-goal-head {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-4);
+	padding-bottom: var(--size-4-4);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.fmr-goal-ring {
+	position: relative;
+	flex: none;
+	width: 4.75rem;
+	height: 4.75rem;
+}
+.fmr-goal-ring svg {
+	width: 100%;
+	height: 100%;
+}
+.fmr-goal-ring-track,
+.fmr-goal-ring-fill {
+	fill: none;
+	stroke-width: 3.5;
+}
+.fmr-goal-ring-track {
+	stroke: rgba(var(--fmr-goal-hue), 0.18);
+}
+.fmr-goal-ring-fill {
+	stroke: rgb(var(--fmr-goal-hue));
+	stroke-linecap: round;
+}
+.fmr-goal-ring.is-met .fmr-goal-ring-fill {
+	stroke-linecap: butt;
+}
+.fmr-goal-ring-inner {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	color: rgb(var(--fmr-goal-hue));
+	font-variant-numeric: tabular-nums;
+	line-height: 1.1;
+}
+.fmr-goal-ring-inner svg {
+	width: 1.75rem;
+	height: 1.75rem;
+	stroke-width: 2.5;
+}
+.fmr-goal-ring-value {
+	font-size: 1.25rem;
+	font-weight: var(--font-semibold);
+}
+.fmr-goal-ring-unit {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.fmr-goal-text {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.fmr-goal-title {
+	font-family: var(--font-text);
+	font-size: 1.4rem;
+	font-weight: var(--font-bold);
+	line-height: 1.2;
+}
+.fmr-goal-sub {
+	margin-top: var(--size-4-1);
+	color: var(--text-muted);
+}
+.fmr-goal-badge {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	min-width: 3.75rem;
+	padding: var(--size-4-2) var(--size-4-3);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	color: var(--text-faint);
+	line-height: 1.15;
+}
+.fmr-goal-badge.is-lit {
+	background: rgba(var(--fmr-goal-hue), 0.12);
+	color: rgb(var(--fmr-goal-hue));
+}
+.fmr-goal-badge-icon svg {
+	width: 1.1rem;
+	height: 1.1rem;
+}
+.fmr-goal-badge-value {
+	color: var(--text-normal);
+	font-size: 1.4rem;
+	font-weight: var(--font-bold);
+	font-variant-numeric: tabular-nums;
+}
+.fmr-goal-badge-label {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+.fmr-shelf button.fmr-goal-toggle {
+	display: flex;
+	align-items: baseline;
+	gap: var(--size-4-2);
+	width: 100%;
+	height: auto;
+	margin: var(--size-4-3) 0 0;
+	padding: var(--size-4-1) 0;
+	border: none;
+	background: none;
+	box-shadow: none;
+	color: var(--text-muted);
+	text-align: start;
+	cursor: pointer;
+}
+.fmr-goal-toggle-count {
+	color: var(--text-normal);
+	font-size: 1.15rem;
+	font-weight: var(--font-bold);
+	font-variant-numeric: tabular-nums;
+}
+.fmr-goal-toggle-label {
+	flex: 1 1 auto;
+}
+.fmr-goal-toggle-chevron {
+	align-self: center;
+	display: flex;
+	transition: transform 150ms ease;
+}
+.fmr-goal-toggle[aria-expanded="false"] .fmr-goal-toggle-chevron {
+	transform: rotate(-90deg);
+}
+.fmr-goal-body.is-collapsed {
+	display: none;
+}
+.fmr-goal-cal {
+	margin-top: var(--size-4-3);
+	overflow-x: auto;
+	padding-bottom: var(--size-4-1);
+}
+.fmr-goal-months,
+.fmr-goal-grid {
+	display: grid;
+	grid-template-columns: repeat(var(--fmr-goal-weeks), var(--fmr-goal-cell));
+	column-gap: var(--fmr-goal-gap);
+	width: max-content;
+	margin-inline-start: auto;
+}
+.fmr-goal-months {
+	margin-bottom: var(--size-4-1);
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+.fmr-goal-month {
+	grid-row: 1;
+	white-space: nowrap;
+}
+.fmr-goal-grid {
+	grid-template-rows: repeat(7, var(--fmr-goal-cell));
+	grid-auto-flow: column;
+	row-gap: var(--fmr-goal-gap);
+}
+.fmr-goal-cell {
+	display: inline-block;
+	width: var(--fmr-goal-cell);
+	height: var(--fmr-goal-cell);
+	border-radius: 3px;
+}
+.fmr-goal-cell.is-blank {
+	visibility: hidden;
+}
+.fmr-goal-l0 { background: var(--background-modifier-border); }
+.fmr-goal-l1 { background: rgba(var(--fmr-goal-hue), 0.25); }
+.fmr-goal-l2 { background: rgba(var(--fmr-goal-hue), 0.45); }
+.fmr-goal-l3 { background: rgba(var(--fmr-goal-hue), 0.75); }
+.fmr-goal-l4 { background: rgb(var(--fmr-goal-hue)); }
+.fmr-goal-cell.is-today {
+	outline: 1.5px solid var(--text-normal);
+	outline-offset: 1px;
+}
+.fmr-goal-legend {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: var(--fmr-goal-gap);
+	margin-top: var(--size-4-2);
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+.fmr-goal-legend span:first-child {
+	margin-inline-end: var(--size-4-1);
+}
+.fmr-goal-legend span:last-child {
+	margin-inline-start: var(--size-4-1);
+}
+.fmr-goal-foot {
+	margin-top: var(--size-4-3);
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+@container (max-width: 30rem) {
+	.fmr-goal-head {
+		flex-wrap: wrap;
+	}
+	.fmr-goal-ring {
+		width: 3.75rem;
+		height: 3.75rem;
+	}
+	.fmr-goal-title {
+		font-size: 1.2rem;
+	}
+	.fmr-goal-text {
+		flex-basis: calc(100% - 9rem);
+	}
+}
